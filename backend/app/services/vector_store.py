@@ -16,15 +16,11 @@ class VectorStore:
 
     def _get_client(self) -> QdrantClient:
         if self._client is None:
-            if settings.qdrant_use_memory:
-                self._client = QdrantClient(":memory:")
-                logger.info("Using in-memory Qdrant")
-            else:
-                self._client = QdrantClient(
-                    host=settings.qdrant_host,
-                    port=settings.qdrant_port,
-                )
-                logger.info("Connected to Qdrant", host=settings.qdrant_host, port=settings.qdrant_port)
+            self._client = QdrantClient(
+                host=settings.qdrant_host,
+                port=settings.qdrant_port,
+            )
+            logger.info("Connected to Qdrant", host=settings.qdrant_host, port=settings.qdrant_port)
         return self._client
 
     def ensure_collection(self) -> None:

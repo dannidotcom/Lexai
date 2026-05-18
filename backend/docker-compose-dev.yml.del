@@ -83,7 +83,6 @@ services:
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
       QDRANT_COLLECTION: lexia_chunks_dev
-      QDRANT_USE_MEMORY: "true"
       CHUNK_SIZE: 1000
       CHUNK_OVERLAP: 200
       MAX_CHUNKS_PER_SEARCH: 10

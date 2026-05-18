@@ -16,7 +16,6 @@ class Settings(BaseSettings):
     qdrant_host: str = os.environ.get("QDRANT_HOST", "localhost")
     qdrant_port: int = int(os.environ.get("QDRANT_PORT", "6333"))
     qdrant_collection: str = os.environ.get("QDRANT_COLLECTION", "lexia_chunks")
-    qdrant_use_memory: bool = os.environ.get("QDRANT_USE_MEMORY", "true").lower() == "true"
 
     chunk_size: int = 1000
     chunk_overlap: int = 200

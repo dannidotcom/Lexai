@@ -274,12 +274,9 @@ services:
           memory: 2G
 ```
 
-### Mode in-memory (développement - plus rapide)
+### Qdrant réel (recommandé)
 
-```bash
-# Dans .env
-QDRANT_USE_MEMORY=true  # Pas de disque
-```
+Le backend utilise toujours le service Qdrant réel, pas une instance en mémoire volatile.
 
 ---
 
