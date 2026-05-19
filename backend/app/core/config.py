@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     chunk_size: int = 1000
     chunk_overlap: int = 200
     max_chunks_per_search: int = 10
-    ai_timeout_seconds: int = 120
+    ai_timeout_seconds: int = 300
 
     class Config:
         env_file = ".env"

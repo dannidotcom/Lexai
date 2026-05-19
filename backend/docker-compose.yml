@@ -171,7 +171,7 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@lexia.com
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
-      SCRIPT_NAME: /pgadmin
+      SCRIPT_NAME: pgadmin
     ports:
       - "5050:80"
     depends_on:

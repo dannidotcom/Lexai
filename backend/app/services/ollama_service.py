@@ -60,12 +60,20 @@ class OllamaService:
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=1, min=2, max=15))
     async def generate_response(self, prompt: str, system_prompt: str = "") -> str:
         try:
+            # Utiliser l'endpoint /api/chat qui supporte le format messages
             messages = []
             if system_prompt:
                 messages.append({"role": "system", "content": system_prompt})
             messages.append({"role": "user", "content": prompt})
 
-            async with httpx.AsyncClient(timeout=settings.ai_timeout_seconds) as client:
+            logger.info(f"Calling Ollama LLM", model=self.llm_model, endpoint="/api/chat")
+            timeout = httpx.Timeout(
+            connect=30.0,
+            read=settings.ai_timeout_seconds,
+            write=30.0,
+            pool=30.0,
+        )
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 resp = await client.post(
                     f"{self.base_url}/api/chat",
                     json={
@@ -80,9 +88,14 @@ class OllamaService:
                 )
                 resp.raise_for_status()
                 data = resp.json()
-                return data.get("message", {}).get("content", "")
+                content = data.get("message", {}).get("content", "")
+                
+                if not content:
+                    logger.warning(f"Empty response from Ollama", model=self.llm_model, response=data)
+                
+                return content
         except Exception as e:
-            logger.error("LLM generation failed", error=str(e), model=self.llm_model)
+            logger.error("LLM generation failed", error=str(e), model=self.llm_model, endpoint="/api/chat")
             raise
 
 

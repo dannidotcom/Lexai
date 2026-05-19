@@ -11,6 +11,9 @@ from app.services.ollama_service import ollama_service
 from app.core.config import settings
 from app.core.logging import logger
 
+# Service central d'IA : construction de prompts, gestion du RAG, appel du modèle LLM,
+# calcul de la confiance et sauvegarde des échanges utilisateur/assistant.
+
 SYSTEM_PROMPT = """
 Tu es LexIA, un moteur d’intelligence artificielle juridique souverain.
 
@@ -49,6 +52,7 @@ STRUCTURE DE RÉPONSE OBLIGATOIRE :
 3. Références précises utilisées (obligatoire)
 """
 
+# Prompt dédié aux explications claires et accessibles basées sur les mêmes règles de sourcing.
 EXPLAIN_PROMPT = """
 Tu es LexIA, un assistant juridique souverain spécialisé dans la vulgarisation du droit.
 
@@ -68,6 +72,8 @@ STRUCTURE DE RÉPONSE :
 3. Implications juridiques principales
 4. Sources utilisées
 """
+
+# Prompt spécifique pour l'analyse de situations juridiques, avec règles strictes et validation humaine.
 ANALYZE_PROMPT = """
 Tu es LexIA, un moteur d’analyse juridique souverain spécialisé en droit social et RH.
 
@@ -93,6 +99,8 @@ STRUCTURE DE RÉPONSE :
 """
 
 class AIService:
+    # Classe de service qui construit les prompts et pilote les appels entre le RAG,
+    # le moteur LLM et la base de données d'historique des sessions.
     async def _build_prompt_with_context(
         self,
         question: str,
@@ -101,6 +109,7 @@ class AIService:
         situation: Optional[str] = None,
     ) -> str:
         if task_type == "analyze" and situation:
+            # Construction du prompt pour l'analyse de situation en incluant le contexte
             return f"""SITUATION À ANALYSER :
 {situation}
 
@@ -130,12 +139,15 @@ Réponds à cette question en te basant exclusivement sur ces sources officielle
 
     def _get_system_prompt(self, task_type: str) -> str:
         if task_type == "explain":
+            # Choisir le prompt système le plus adapté au type de tâche.
             return EXPLAIN_PROMPT
         elif task_type == "analyze":
             return ANALYZE_PROMPT
+        # Par défaut, utiliser le prompt général pour les questions juridiques.
         return SYSTEM_PROMPT
 
     def _calculate_confidence(self, sources_count: int, has_context: bool) -> float:
+        # Score de confiance basé sur la présence et le nombre de sources retournées.
         if not has_context or sources_count == 0:
             return 0.0
         if sources_count >= 3:
@@ -145,6 +157,7 @@ Réponds à cette question en te basant exclusivement sur ces sources officielle
         return 0.60
 
     def _build_citations(self, sources: list) -> List[CitationSchema]:
+        # Transforme les résultats de contexte en citations structurées pour l'API.
         citations = []
         for item in sources:
             citations.append(CitationSchema(
@@ -165,6 +178,7 @@ Réponds à cette question en te basant exclusivement sur ces sources officielle
     ) -> AiResponseSchema:
         task_type = input_data.taskType.value if hasattr(input_data.taskType, 'value') else str(input_data.taskType)
 
+        # Recherche contextuelle via RAG en utilisant la question de l'utilisateur.
         context_result = await rag_service.get_context(
             query=input_data.question,
             db=db,
@@ -175,6 +189,7 @@ Réponds à cette question en te basant exclusivement sur ces sources officielle
         has_context = len(context_result.sources) > 0
 
         if not has_context:
+            # Si aucun contexte n'est disponible, renvoyer une réponse de secours claire.
             answer = (
                 "Je ne dispose pas d'informations suffisantes dans les sources officielles "
                 "importées pour répondre à cette question. "
@@ -182,6 +197,7 @@ Réponds à cette question en te basant exclusivement sur ces sources officielle
             )
             model_used = "fallback"
         else:
+            # Construire le prompt utilisateur + contexte et envoyer au moteur LLM.
             prompt = await self._build_prompt_with_context(
                 question=input_data.question,
                 context=context_result.context,
@@ -191,10 +207,20 @@ Réponds à cette question en te basant exclusivement sur ces sources officielle
             try:
                 answer = await ollama_service.generate_response(prompt, system_prompt)
                 model_used = settings.ollama_llm_model
+                print(f"************+*+*+*+*+*+*+*+ MODEL UTILISE *******************: {model_used}")
+                # Vérifier que la réponse n'est pas vide
+                if not answer or not answer.strip():
+                    logger.warning("LLM returned empty response", model=settings.ollama_llm_model)
+                    answer = (
+                        "Le moteur IA a retourné une réponse vide. "
+                        "Veuillez vérifier que les modèles Ollama sont correctement déployés. "
+                        "Voici les sources trouvées :\n\n" +
+                        context_result.context[:2000]
+                    )
+                    model_used = "mistral_empty_response"
             except Exception as e:
-                logger.error("LLM generation error", error=str(e))
-                answer = (
-                    "Le moteur IA n'est pas disponible actuellement. "
+                logger.error("LLM generation error", error=str(e), task_type=task_type)
+                answer = ("Le moteur IA n'est pas disponible actuellement. "
                     "Voici les sources officielles trouvées :\n\n" +
                     context_result.context[:2000]
                 )
@@ -230,6 +256,7 @@ Réponds à cette question en te basant exclusivement sur ces sources officielle
         input_data: AiAnalyzeInputSchema,
         db: DBSession,
     ) -> AiResponseSchema:
+        # Pour l'analyse, concaténer la question et la situation afin d'améliorer la recherche de contexte.
         query_text = f"{input_data.question}\n{input_data.situation}"
 
         context_result = await rag_service.get_context(
@@ -242,12 +269,14 @@ Réponds à cette question en te basant exclusivement sur ces sources officielle
         has_context = len(context_result.sources) > 0
 
         if not has_context:
+            # Aucun contexte trouvé pour l'analyse : réponse de secours adaptée.
             answer = (
                 "Je ne dispose pas d'informations suffisantes dans les sources officielles "
                 "pour analyser cette situation. Veuillez vérifier que les documents pertinents sont importés."
             )
             model_used = "fallback"
         else:
+            # Préparer le prompt d'analyse complet et interroger le modèle avec le prompt dédié.
             prompt = await self._build_prompt_with_context(
                 question=input_data.question,
                 context=context_result.context,
@@ -257,6 +286,17 @@ Réponds à cette question en te basant exclusivement sur ces sources officielle
             try:
                 answer = await ollama_service.generate_response(prompt, ANALYZE_PROMPT)
                 model_used = settings.ollama_llm_model
+                
+                # Vérifier que la réponse n'est pas vide
+                if not answer or not answer.strip():
+                    logger.warning("LLM returned empty response for analysis", model=settings.ollama_llm_model)
+                    answer = (
+                        "Le moteur IA a retourné une réponse vide. "
+                        "Veuillez vérifier que les modèles Ollama sont correctement déployés. "
+                        "Voici les sources trouvées :\n\n" +
+                        context_result.context[:2000]
+                    )
+                    model_used = "mistral_empty_response"
             except Exception as e:
                 logger.error("LLM analysis error", error=str(e))
                 answer = (
@@ -297,6 +337,7 @@ Réponds à cette question en te basant exclusivement sur ces sources officielle
         question: str,
         response: AiResponseSchema,
     ) -> None:
+        # Enregistre la conversation utilisateur / assistant dans la base de données.
         try:
             session = db.query(Session).filter(Session.id == session_id).first()
             if not session:
