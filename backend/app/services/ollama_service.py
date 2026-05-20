@@ -82,7 +82,9 @@ class OllamaService:
                         "stream": False,
                         "options": {
                             "temperature": 0.1,
-                            "num_predict": 2048,
+                            "num_predict": 256,
+                            "num_ctx": 2048,
+                            "num_thread": 8,
                         },
                     },
                 )

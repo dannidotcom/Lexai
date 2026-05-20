@@ -99,7 +99,7 @@ services:
       # RAG Configuration
       CHUNK_SIZE: ${CHUNK_SIZE:-1000}
       CHUNK_OVERLAP: ${CHUNK_OVERLAP:-200}
-      MAX_CHUNKS_PER_SEARCH: ${MAX_CHUNKS_PER_SEARCH:-10}
+      MAX_CHUNKS_PER_SEARCH: ${MAX_CHUNKS_PER_SEARCH:-5}
       AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-120}
 
       # Python
@@ -168,16 +168,21 @@ services:
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: lexia-pgadmin
+
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@lexia.com
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
-      SCRIPT_NAME: pgadmin
+      SCRIPT_NAME: /pgadmin
+
     ports:
       - "5050:80"
+
     depends_on:
       - postgres
+
     networks:
       - lexia-network
+
     restart: unless-stopped
     # Accès: http://localhost:5050/pgadmin
 
