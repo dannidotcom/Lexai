@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import {
   useListSessions, useCreateSession, useGetSessionMessages,
-  useAiQuery, useAiExplain,
   getListSessionsQueryKey, getGetSessionMessagesQueryKey,
+  consumeAiStream,
+  type AiStreamCitation,
+  type AiTaskType,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Send, ChevronDown, AlertTriangle, Bot, Loader2, Scale, BookOpen, Sparkles } from "lucide-react";
@@ -12,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-type TaskType = "query" | "explain" | "analyze";
+type TaskType = AiTaskType;
 
 interface PendingMessage {
   role: "user" | "assistant";
@@ -37,41 +39,40 @@ const SUGGESTIONS = [
 ];
 
 const TASK_OPTIONS: Array<{ value: TaskType; label: string; icon: React.ElementType }> = [
-  { value: "query",   label: "Question",    icon: Sparkles },
+  { value: "query", label: "Question", icon: Sparkles },
   { value: "explain", label: "Explication", icon: BookOpen },
-  { value: "analyze", label: "Analyse",     icon: Scale    },
+  { value: "analyze", label: "Analyse", icon: Scale },
 ];
 
 const DOMAINS = ["travail", "social", "commercial", "fiscal", "civil"];
 
-// ── Citation ────────────────────────────────────────────
 function CitationCard({ citation, index }: { citation: PendingMessage["citations"][number]; index: number }) {
   const score = Math.round(citation.relevanceScore * 100);
   return (
-    <div className="flex gap-3 p-3 rounded-lg border border-border/50 bg-secondary/20 hover:bg-secondary/40 transition-colors">
-      <div className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center mt-0.5">
-        <span className="text-[9px] font-mono font-bold text-primary">{index + 1}</span>
+    <div className="flex gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50 hover:border-sky-200 hover:bg-sky-50/40 transition-colors">
+      <div className="flex-shrink-0 w-5 h-5 rounded-full bg-sky-100 flex items-center justify-center mt-0.5">
+        <span className="text-[9px] font-bold text-sky-700">{index + 1}</span>
       </div>
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-start gap-2 justify-between">
-          <span className="text-[12px] font-semibold text-foreground leading-snug truncate">{citation.documentTitle}</span>
+          <span className="text-[12px] font-semibold text-gray-800 leading-snug truncate">{citation.documentTitle}</span>
           <span className={cn(
-            "text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md flex-shrink-0",
-            score >= 80 ? "bg-emerald-950/40 text-emerald-400" :
-            score >= 50 ? "bg-amber-950/40 text-amber-400" :
-                          "bg-secondary text-muted-foreground",
+            "text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0",
+            score >= 80 ? "bg-emerald-100 text-emerald-700" :
+              score >= 50 ? "bg-amber-100 text-amber-700" :
+                "bg-gray-100 text-gray-600",
           )}>
             {score}%
           </span>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] bg-secondary border border-border/60 px-1.5 py-0.5 rounded font-mono">{citation.source}</span>
+          <span className="text-[10px] bg-white border border-gray-200 px-1.5 py-0.5 rounded font-mono text-gray-500">{citation.source}</span>
           {citation.articleId && (
-            <span className="text-[10px] font-mono text-primary">Art. {citation.articleId}</span>
+            <span className="text-[10px] font-mono text-sky-600 font-semibold">Art. {citation.articleId}</span>
           )}
-          <span className="text-[10px] text-muted-foreground/60 truncate">{citation.sectionPath}</span>
+          <span className="text-[10px] text-gray-400 truncate">{citation.sectionPath}</span>
         </div>
-        <p className="text-[11px] text-muted-foreground italic leading-relaxed line-clamp-2">
+        <p className="text-[11px] text-gray-500 italic leading-relaxed line-clamp-2">
           "{citation.excerpt}"
         </p>
       </div>
@@ -79,15 +80,14 @@ function CitationCard({ citation, index }: { citation: PendingMessage["citations
   );
 }
 
-// ── Message ─────────────────────────────────────────────
 function MessageBubble({ msg }: { msg: PendingMessage }) {
   const [showCitations, setShowCitations] = useState(false);
 
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[78%] bg-primary/12 border border-primary/20 rounded-2xl rounded-tr-sm px-4 py-3">
-          <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+        <div className="max-w-[78%] bg-sky-500 rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm">
+          <p className="text-[13px] text-white whitespace-pre-wrap leading-relaxed">{msg.content}</p>
         </div>
       </div>
     );
@@ -95,22 +95,22 @@ function MessageBubble({ msg }: { msg: PendingMessage }) {
 
   return (
     <div className="flex gap-3 max-w-[88%]">
-      <div className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center mt-0.5 border border-primary/20">
-        <Bot className="w-3.5 h-3.5 text-primary" />
+      <div className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-sky-500 to-sky-600 rounded-xl flex items-center justify-center mt-0.5 shadow-sm">
+        <Bot className="w-3.5 h-3.5 text-white" />
       </div>
       <div className="flex-1 space-y-2 min-w-0">
         {msg.isPending ? (
-          <div className="inline-flex items-center gap-2 bg-card border border-card-border rounded-2xl rounded-tl-sm px-4 py-3">
+          <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
             <div className="flex gap-1">
-              <div className="dot-1 w-1.5 h-1.5 rounded-full bg-primary" />
-              <div className="dot-2 w-1.5 h-1.5 rounded-full bg-primary" />
-              <div className="dot-3 w-1.5 h-1.5 rounded-full bg-primary" />
+              <div className="dot-1 w-1.5 h-1.5 rounded-full bg-sky-500" />
+              <div className="dot-2 w-1.5 h-1.5 rounded-full bg-sky-500" />
+              <div className="dot-3 w-1.5 h-1.5 rounded-full bg-sky-500" />
             </div>
-            <span className="text-[11px] text-muted-foreground">Analyse en cours…</span>
+            <span className="text-[11px] text-gray-400">Analyse en cours…</span>
           </div>
         ) : (
-          <div className="bg-card border border-card-border rounded-2xl rounded-tl-sm px-4 py-3">
-            <p className="text-[13px] text-foreground whitespace-pre-wrap leading-[1.7]">{msg.content}</p>
+          <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+            <p className="text-[13px] text-gray-800 whitespace-pre-wrap leading-[1.7]">{msg.content}</p>
           </div>
         )}
 
@@ -118,9 +118,9 @@ function MessageBubble({ msg }: { msg: PendingMessage }) {
           <div>
             <button
               onClick={() => setShowCitations(!showCitations)}
-              className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors py-1 px-1 rounded"
+              className="flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-sky-600 transition-colors py-1 px-1 rounded"
             >
-              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+              <div className="w-1.5 h-1.5 rounded-full bg-sky-500" />
               <span>
                 {msg.citations.length} source{msg.citations.length !== 1 ? "s" : ""} citée{msg.citations.length !== 1 ? "s" : ""}
               </span>
@@ -135,9 +135,9 @@ function MessageBubble({ msg }: { msg: PendingMessage }) {
         )}
 
         {!msg.isPending && msg.citations.length === 0 && (
-          <div className="flex items-center gap-1.5 text-[11px] text-yellow-600/80 px-1">
+          <div className="flex items-center gap-1.5 text-[11px] text-amber-500 px-1">
             <AlertTriangle className="w-3 h-3" />
-            <span>Aucune source officielle disponible pour cette réponse</span>
+            <span>Aucune source officielle disponible</span>
           </div>
         )}
       </div>
@@ -145,7 +145,6 @@ function MessageBubble({ msg }: { msg: PendingMessage }) {
   );
 }
 
-// ── Page ────────────────────────────────────────────────
 export default function Chat() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
@@ -154,7 +153,9 @@ export default function Chat() {
   const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const queryClient = useQueryClient();
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const { data: sessions, isLoading: sessionsLoading } = useListSessions();
   const { data: messages } = useGetSessionMessages(
@@ -172,13 +173,13 @@ export default function Chat() {
     },
   });
 
-  const aiQuery   = useAiQuery();
-  const aiExplain = useAiExplain();
-  const isLoading = aiQuery.isPending || aiExplain.isPending;
+  const isLoading = isStreaming;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pendingMessages]);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const handleNewSession = () => {
     createSession.mutate({
@@ -193,44 +194,68 @@ export default function Chat() {
     textareaRef.current?.focus();
 
     const userMsg: PendingMessage = { role: "user", content: q, citations: [], createdAt: new Date().toISOString() };
-    const pending: PendingMessage  = { role: "assistant", content: "", citations: [], createdAt: new Date().toISOString(), isPending: true };
+    const pending: PendingMessage = { role: "assistant", content: "", citations: [], createdAt: new Date().toISOString(), isPending: true };
     setPendingMessages(prev => [...prev, userMsg, pending]);
+    setIsStreaming(true);
 
     const payload = {
-      data: {
-        question: q,
-        domain: domain && domain !== "all" ? domain : undefined,
-        sessionId: activeSessionId || undefined,
-        taskType: taskType as "query" | "explain" | "analyze",
-      },
+      question: q,
+      domain: domain && domain !== "all" ? domain : undefined,
+      sessionId: activeSessionId || undefined,
+      taskType,
+      ...(taskType === "analyze" ? { situation: q } : {}),
     };
 
-    try {
-      const response = taskType === "explain"
-        ? await aiExplain.mutateAsync(payload)
-        : await aiQuery.mutateAsync(payload);
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
+    let citations: AiStreamCitation[] = [];
+    let content = "";
+
+    const updateAssistant = (pending = true) => {
       setPendingMessages(prev => {
         const updated = [...prev];
         const lastIdx = updated.findLastIndex(m => m.isPending);
         if (lastIdx !== -1) {
           updated[lastIdx] = {
-            role: "assistant",
-            content: response.answer,
-            citations: response.citations,
-            createdAt: response.generatedAt,
-            isPending: false,
+            ...updated[lastIdx],
+            content,
+            citations,
+            isPending: pending,
           };
         }
         return updated;
       });
+    };
+
+    try {
+      content = await consumeAiStream(
+        taskType,
+        payload,
+        {
+          onMeta: (event) => {
+            citations = event.citations ?? [];
+            updateAssistant();
+          },
+          onChunk: (_text, accumulated) => {
+            content = accumulated;
+            updateAssistant();
+          },
+        },
+        controller.signal,
+      );
+
+      updateAssistant(false);
 
       if (activeSessionId) {
         queryClient.invalidateQueries({ queryKey: getGetSessionMessagesQueryKey(activeSessionId) });
         queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
         setPendingMessages([]);
       }
-    } catch {
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      console.error(err);
       setPendingMessages(prev => {
         const updated = [...prev];
         const lastIdx = updated.findLastIndex(m => m.isPending);
@@ -245,26 +270,34 @@ export default function Chat() {
         }
         return updated;
       });
+    } finally {
+      setIsStreaming(false);
+      abortRef.current = null;
     }
   };
 
   const displayMessages: PendingMessage[] =
     activeSessionId && messages && pendingMessages.length === 0
-      ? messages.map(m => ({ role: m.role as "user" | "assistant", content: m.content, citations: m.citations, createdAt: m.createdAt }))
+      ? messages.map(m => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+          citations: m.citations as PendingMessage["citations"],
+          createdAt: m.createdAt,
+        }))
       : pendingMessages;
 
   const activeTask = TASK_OPTIONS.find(t => t.value === taskType)!;
 
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex overflow-hidden bg-gray-50/50">
 
-      {/* ── Session sidebar ─────────────────── */}
-      <div className="w-[200px] flex-shrink-0 border-r border-border flex flex-col" style={{ background: "hsl(var(--sidebar))" }}>
-        <div className="p-3 border-b border-border">
+      {/* Session sidebar */}
+      <div className="w-[200px] flex-shrink-0 border-r border-gray-200 flex flex-col bg-white">
+        <div className="p-3 border-b border-gray-100">
           <Button
             onClick={handleNewSession}
             size="sm"
-            className="w-full gap-2 text-[12px] h-8 rounded-lg"
+            className="w-full gap-2 text-[12px] h-8 rounded-lg bg-sky-500 hover:bg-sky-600 text-white border-0"
             data-testid="button-new-session"
             disabled={createSession.isPending}
           >
@@ -276,12 +309,12 @@ export default function Chat() {
         <div className="flex-1 overflow-y-auto py-2 px-1.5">
           {sessionsLoading ? (
             <div className="space-y-1.5 p-1">
-              {[1, 2, 3].map(i => <Skeleton key={i} className="h-11 w-full rounded-lg" />)}
+              {[1, 2, 3].map(i => <Skeleton key={i} className="h-11 w-full rounded-lg bg-gray-100" />)}
             </div>
           ) : (sessions ?? []).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 px-3 text-center gap-2">
-              <MessageSquareIcon className="w-6 h-6 text-muted-foreground/20" />
-              <p className="text-[11px] text-muted-foreground leading-relaxed">Créez une session pour commencer</p>
+              <MessageSquareIcon className="w-6 h-6 text-gray-200" />
+              <p className="text-[11px] text-gray-400 leading-relaxed">Créez une session pour commencer</p>
             </div>
           ) : (
             (sessions ?? []).map(s => (
@@ -290,21 +323,21 @@ export default function Chat() {
                 data-testid={`button-session-${s.id}`}
                 onClick={() => { setActiveSessionId(s.id); setPendingMessages([]); }}
                 className={cn(
-                  "w-full text-left px-2.5 py-2 rounded-lg transition-all duration-150 group",
+                  "w-full text-left px-2.5 py-2 rounded-lg transition-all duration-150",
                   activeSessionId === s.id
-                    ? "bg-primary/10 border border-primary/20 shadow-[inset_0_0_0_1px_hsl(221_100%_58%/0.12)]"
-                    : "hover:bg-white/[0.04]",
+                    ? "bg-sky-50 border border-sky-200"
+                    : "hover:bg-gray-50 border border-transparent",
                 )}
               >
                 <p className={cn(
                   "text-[12px] font-medium truncate leading-tight",
-                  activeSessionId === s.id ? "text-primary" : "text-foreground",
+                  activeSessionId === s.id ? "text-sky-700" : "text-gray-700",
                 )}>
                   {s.title}
                 </p>
-                <p className="text-[10px] text-muted-foreground/60 mt-0.5 font-mono">
+                <p className="text-[10px] text-gray-400 mt-0.5">
                   {s.messageCount} msg{s.messageCount !== 1 ? "s" : ""}
-                  {s.domain && <span className="text-primary/60 ml-1">· {s.domain}</span>}
+                  {s.domain && <span className="text-sky-500 ml-1">· {s.domain}</span>}
                 </p>
               </button>
             ))
@@ -312,12 +345,11 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* ── Chat area ───────────────────────── */}
+      {/* Chat area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar */}
-        <div className="flex-shrink-0 px-4 h-[52px] border-b border-border flex items-center gap-2.5">
-          {/* Task type */}
-          <div className="flex rounded-lg border border-border overflow-hidden">
+        <div className="flex-shrink-0 px-4 h-[52px] border-b border-gray-200 bg-white flex items-center gap-2.5">
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
             {TASK_OPTIONS.map(opt => {
               const Icon = opt.icon;
               return (
@@ -325,10 +357,10 @@ export default function Chat() {
                   key={opt.value}
                   onClick={() => setTaskType(opt.value)}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition-colors",
+                    "flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition-colors border-r border-gray-200 last:border-0",
                     taskType === opt.value
-                      ? "bg-primary/15 text-primary border-r border-border last:border-0"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary border-r border-border last:border-0",
+                      ? "bg-sky-50 text-sky-700"
+                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-50",
                   )}
                 >
                   <Icon className="w-3 h-3" />
@@ -338,9 +370,8 @@ export default function Chat() {
             })}
           </div>
 
-          {/* Domain */}
           <Select value={domain} onValueChange={setDomain}>
-            <SelectTrigger className="h-8 text-[11px] w-36 rounded-lg" data-testid="select-domain">
+            <SelectTrigger className="h-8 text-[11px] w-36 rounded-lg border-gray-200" data-testid="select-domain">
               <SelectValue placeholder="Tous les domaines" />
             </SelectTrigger>
             <SelectContent>
@@ -350,7 +381,7 @@ export default function Chat() {
           </Select>
 
           {!activeSessionId && (
-            <span className="ml-auto text-[11px] text-muted-foreground/60 italic">Sans session</span>
+            <span className="ml-auto text-[11px] text-gray-400 italic">Sans session</span>
           )}
         </div>
 
@@ -359,16 +390,16 @@ export default function Chat() {
           {displayMessages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-center gap-5 pb-8">
               <div className="relative">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20 shadow-[0_0_24px_hsl(221_100%_58%/0.12)]">
-                  <Bot className="w-8 h-8 text-primary" />
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-sky-500 to-sky-600 flex items-center justify-center shadow-lg shadow-sky-200">
+                  <Bot className="w-8 h-8 text-white" />
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full border-2 border-background flex items-center justify-center">
+                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-400 rounded-full border-2 border-white flex items-center justify-center">
                   <span className="text-[7px] font-bold text-white">AI</span>
                 </div>
               </div>
               <div>
-                <p className="text-[15px] font-semibold text-foreground font-serif">LexIA — Moteur IA Juridique</p>
-                <p className="text-[12px] text-muted-foreground mt-2 max-w-sm leading-relaxed">
+                <p className="text-[16px] font-semibold text-gray-900">LexIA — Moteur IA Juridique</p>
+                <p className="text-[13px] text-gray-500 mt-2 max-w-sm leading-relaxed">
                   Posez une question juridique. Toutes les réponses sont issues exclusivement des sources officielles importées.
                 </p>
               </div>
@@ -377,7 +408,7 @@ export default function Chat() {
                   <button
                     key={q}
                     onClick={() => { setQuestion(q); textareaRef.current?.focus(); }}
-                    className="text-left text-[12px] bg-secondary/40 border border-border/60 rounded-xl px-4 py-2.5 text-muted-foreground hover:text-foreground hover:border-border hover:bg-secondary/70 transition-all duration-150"
+                    className="text-left text-[13px] bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-600 hover:text-gray-900 hover:border-sky-200 hover:bg-sky-50/50 transition-all duration-150 shadow-sm"
                   >
                     {q}
                   </button>
@@ -390,36 +421,34 @@ export default function Chat() {
         </div>
 
         {/* Input */}
-        <div className="flex-shrink-0 px-4 py-3 border-t border-border bg-background/80 backdrop-blur-sm">
+        <div className="flex-shrink-0 px-4 py-3 border-t border-gray-200 bg-white">
           <div className="flex gap-2 items-end max-w-4xl">
-            <div className="flex-1 relative">
-              <Textarea
-                ref={textareaRef}
-                data-testid="input-question"
-                placeholder={`Mode ${activeTask.label.toLowerCase()} — posez votre question juridique… (⏎ pour envoyer)`}
-                value={question}
-                onChange={e => setQuestion(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
-                }}
-                className="resize-none min-h-[52px] max-h-[140px] text-[13px] font-mono pr-2 rounded-xl border-border/60 focus:border-primary/40 transition-colors"
-                disabled={isLoading}
-              />
-            </div>
+            <Textarea
+              ref={textareaRef}
+              data-testid="input-question"
+              placeholder={`Mode ${activeTask.label.toLowerCase()} — posez votre question… (⏎ pour envoyer)`}
+              value={question}
+              onChange={e => setQuestion(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+              }}
+              className="flex-1 resize-none min-h-[52px] max-h-[140px] text-[13px] rounded-xl border-gray-200 focus:border-sky-400 transition-colors"
+              disabled={isLoading}
+            />
             <Button
               onClick={handleSend}
               disabled={!question.trim() || isLoading}
               data-testid="button-send"
               size="icon"
-              className="h-[52px] w-[52px] rounded-xl flex-shrink-0 glow-blue"
+              className="h-[52px] w-[52px] rounded-xl flex-shrink-0 bg-sky-500 hover:bg-sky-600 border-0 shadow-sm shadow-sky-200"
             >
               {isLoading
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : <Send className="w-4 h-4" />}
             </Button>
           </div>
-          <p className="text-[10px] text-muted-foreground/40 mt-2 font-mono">
-            Sources officielles uniquement — aucune hallucination — Maj+Entrée pour nouvelle ligne
+          <p className="text-[10px] text-gray-400 mt-2">
+            Sources officielles uniquement · Maj+Entrée pour nouvelle ligne
           </p>
         </div>
       </div>
