@@ -1,0 +1,47 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build output
+dist
+dist-ssr
+build
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vite cache
+.vite
+.cache
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Coverage (tests)
+coverage
+
+# Optional: lock files (décommente si mono repo strict)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml

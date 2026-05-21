@@ -1,5 +1,6 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.schemas import (
@@ -18,6 +19,14 @@ async def ai_query(data: AiQueryInputSchema, db: Session = Depends(get_db)):
     return await ai_service.query(data, db)
 
 
+@router.post("/query/stream")
+async def ai_query_stream(data: AiQueryInputSchema, db: Session = Depends(get_db)):
+    return StreamingResponse(
+        ai_service.query_stream(data, db),
+        media_type="text/event-stream"
+    )
+
+
 @router.post("/explain", response_model=AiResponseSchema)
 async def ai_explain(data: AiQueryInputSchema, db: Session = Depends(get_db)):
     from app.models.schemas import TaskType
@@ -25,9 +34,27 @@ async def ai_explain(data: AiQueryInputSchema, db: Session = Depends(get_db)):
     return await ai_service.query(data, db)
 
 
+@router.post("/explain/stream")
+async def ai_explain_stream(data: AiQueryInputSchema, db: Session = Depends(get_db)):
+    from app.models.schemas import TaskType
+    data.taskType = TaskType.EXPLAIN
+    return StreamingResponse(
+        ai_service.query_stream(data, db),
+        media_type="text/event-stream"
+    )
+
+
 @router.post("/analyze", response_model=AiResponseSchema)
 async def ai_analyze(data: AiAnalyzeInputSchema, db: Session = Depends(get_db)):
     return await ai_service.analyze(data, db)
+
+
+@router.post("/analyze/stream")
+async def ai_analyze_stream(data: AiAnalyzeInputSchema, db: Session = Depends(get_db)):
+    return StreamingResponse(
+        ai_service.analyze_stream(data, db),
+        media_type="text/event-stream"
+    )
 
 
 @router.get("/sessions", response_model=List[SessionSchema])

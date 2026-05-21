@@ -68,11 +68,11 @@ class OllamaService:
 
             logger.info(f"Calling Ollama LLM", model=self.llm_model, endpoint="/api/chat")
             timeout = httpx.Timeout(
-            connect=30.0,
-            read=settings.ai_timeout_seconds,
-            write=30.0,
-            pool=30.0,
-        )
+                connect=30.0,
+                read=settings.ai_timeout_seconds,
+                write=30.0,
+                pool=30.0,
+            )
             async with httpx.AsyncClient(timeout=timeout) as client:
                 resp = await client.post(
                     f"{self.base_url}/api/chat",
@@ -80,11 +80,11 @@ class OllamaService:
                         "model": self.llm_model,
                         "messages": messages,
                         "stream": False,
+                        "keep_alive": "1h",
                         "options": {
                             "temperature": 0.1,
-                            "num_predict": 256,
+                            "num_predict": 512,
                             "num_ctx": 2048,
-                            "num_thread": 8,
                         },
                     },
                 )
@@ -100,5 +100,50 @@ class OllamaService:
             logger.error("LLM generation failed", error=str(e), model=self.llm_model, endpoint="/api/chat")
             raise
 
+    async def generate_response_stream(self, prompt: str, system_prompt: str = ""):
+        try:
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+
+            logger.info(f"Calling Ollama LLM (Streaming)", model=self.llm_model, endpoint="/api/chat")
+            timeout = httpx.Timeout(
+                connect=30.0,
+                read=settings.ai_timeout_seconds,
+                write=30.0,
+                pool=30.0,
+            )
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                async with client.stream(
+                    "POST",
+                    f"{self.base_url}/api/chat",
+                    json={
+                        "model": self.llm_model,
+                        "messages": messages,
+                        "stream": True,
+                        "keep_alive": "1h",
+                        "options": {
+                            "temperature": 0.1,
+                            "num_predict": 512,
+                            "num_ctx": 2048,
+                        },
+                    },
+                ) as resp:
+                    resp.raise_for_status()
+                    import json
+                    async for chunk in resp.aiter_lines():
+                        if not chunk:
+                            continue
+                        try:
+                            data = json.loads(chunk)
+                            content = data.get("message", {}).get("content", "")
+                            if content:
+                                yield content
+                        except json.JSONDecodeError:
+                            logger.warning("Failed to decode chunk from Ollama", chunk=chunk)
+        except Exception as e:
+            logger.error("LLM streaming failed", error=str(e), model=self.llm_model, endpoint="/api/chat")
+            raise
 
 ollama_service = OllamaService()

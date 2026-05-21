@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { flushSync } from "react-dom";
 import {
   useListSessions, useCreateSession, useGetSessionMessages,
   getListSessionsQueryKey, getGetSessionMessagesQueryKey,
@@ -82,6 +83,8 @@ function CitationCard({ citation, index }: { citation: PendingMessage["citations
 
 function MessageBubble({ msg }: { msg: PendingMessage }) {
   const [showCitations, setShowCitations] = useState(false);
+  const isStreaming = msg.isPending && msg.content.length > 0;
+  const isWaiting = msg.isPending && msg.content.length === 0;
 
   if (msg.role === "user") {
     return (
@@ -99,18 +102,24 @@ function MessageBubble({ msg }: { msg: PendingMessage }) {
         <Bot className="w-3.5 h-3.5 text-white" />
       </div>
       <div className="flex-1 space-y-2 min-w-0">
-        {msg.isPending ? (
+        {isWaiting ? (
           <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
             <div className="flex gap-1">
               <div className="dot-1 w-1.5 h-1.5 rounded-full bg-sky-500" />
               <div className="dot-2 w-1.5 h-1.5 rounded-full bg-sky-500" />
               <div className="dot-3 w-1.5 h-1.5 rounded-full bg-sky-500" />
             </div>
-            <span className="text-[11px] text-gray-400">Analyse en cours…</span>
+            <span className="text-[11px] text-gray-400">Recherche dans les sources…</span>
           </div>
         ) : (
           <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-            <p className="text-[13px] text-gray-800 whitespace-pre-wrap leading-[1.7]">{msg.content}</p>
+            <p className="text-[13px] text-gray-800 whitespace-pre-wrap leading-[1.7]">
+              {msg.content}
+              {isStreaming && <span className="stream-cursor" aria-hidden />}
+            </p>
+            {isStreaming && (
+              <p className="text-[10px] text-sky-500/80 mt-2 font-medium">Rédaction en cours…</p>
+            )}
           </div>
         )}
 
@@ -176,8 +185,11 @@ export default function Chat() {
   const isLoading = isStreaming;
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, pendingMessages]);
+    bottomRef.current?.scrollIntoView({
+      behavior: isStreaming ? "auto" : "smooth",
+      block: "end",
+    });
+  }, [messages, pendingMessages, isStreaming]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -214,18 +226,20 @@ export default function Chat() {
     let content = "";
 
     const updateAssistant = (pending = true) => {
-      setPendingMessages(prev => {
-        const updated = [...prev];
-        const lastIdx = updated.findLastIndex(m => m.isPending);
-        if (lastIdx !== -1) {
-          updated[lastIdx] = {
-            ...updated[lastIdx],
-            content,
-            citations,
-            isPending: pending,
-          };
-        }
-        return updated;
+      flushSync(() => {
+        setPendingMessages(prev => {
+          const updated = [...prev];
+          const lastIdx = updated.findLastIndex(m => m.isPending);
+          if (lastIdx !== -1) {
+            updated[lastIdx] = {
+              ...updated[lastIdx],
+              content,
+              citations,
+              isPending: pending,
+            };
+          }
+          return updated;
+        });
       });
     };
 
@@ -249,7 +263,9 @@ export default function Chat() {
       updateAssistant(false);
 
       if (activeSessionId) {
-        queryClient.invalidateQueries({ queryKey: getGetSessionMessagesQueryKey(activeSessionId) });
+        await queryClient.refetchQueries({
+          queryKey: getGetSessionMessagesQueryKey(activeSessionId),
+        });
         queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
         setPendingMessages([]);
       }
@@ -276,15 +292,20 @@ export default function Chat() {
     }
   };
 
-  const displayMessages: PendingMessage[] =
-    activeSessionId && messages && pendingMessages.length === 0
+  const historyMessages: PendingMessage[] =
+    activeSessionId && messages
       ? messages.map(m => ({
           role: m.role as "user" | "assistant",
           content: m.content,
           citations: m.citations as PendingMessage["citations"],
           createdAt: m.createdAt,
         }))
-      : pendingMessages;
+      : [];
+
+  const displayMessages: PendingMessage[] =
+    pendingMessages.length > 0
+      ? [...historyMessages, ...pendingMessages]
+      : historyMessages;
 
   const activeTask = TASK_OPTIONS.find(t => t.value === taskType)!;
 
@@ -416,7 +437,12 @@ export default function Chat() {
               </div>
             </div>
           )}
-          {displayMessages.map((msg, i) => <MessageBubble key={i} msg={msg} />)}
+          {displayMessages.map((msg, i) => (
+            <MessageBubble
+              key={`${msg.createdAt}-${i}-${msg.isPending ? msg.content.length : "done"}`}
+              msg={msg}
+            />
+          ))}
           <div ref={bottomRef} />
         </div>
 

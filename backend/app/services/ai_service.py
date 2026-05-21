@@ -271,6 +271,91 @@ Réponds uniquement à partir des sources.
         return response
 
     # =========================
+    # QUERY STREAM
+    # =========================
+    async def query_stream(
+        self,
+        input_data: AiQueryInputSchema,
+        db: DBSession,
+    ):
+        import json
+        
+        task_type = (
+            input_data.taskType.value
+            if hasattr(input_data.taskType, "value")
+            else str(input_data.taskType)
+        )
+
+        context_result = await rag_service.get_context(
+            query=input_data.question,
+            db=db,
+            domain=input_data.domain,
+            limit=settings.max_chunks_per_search,
+        )
+
+        has_context = len(context_result.sources) > 0
+        citations = self._build_citations(context_result.sources)
+        confidence = self._calculate_confidence(len(citations), has_context)
+        
+        # Send initial metadata (citations)
+        yield f"data: {json.dumps({'type': 'meta', 'citations': [c.model_dump() for c in citations], 'confidence': confidence})}\n\n"
+
+        if not has_context:
+            answer = (
+                "Je ne dispose pas d'informations suffisantes dans les sources officielles "
+                "pour répondre à cette question."
+            )
+            model_used = "fallback"
+            yield f"data: {json.dumps({'type': 'chunk', 'text': answer})}\n\n"
+        else:
+            prompt = await self._build_prompt_with_context(
+                question=input_data.question,
+                context=context_result.context,
+                task_type=task_type,
+            )
+            system_prompt = self._get_system_prompt(task_type)
+            model_used = settings.ollama_llm_model
+            answer = ""
+
+            try:
+                async for chunk in ollama_service.generate_response_stream(prompt, system_prompt):
+                    answer += chunk
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
+                
+                if not answer.strip():
+                    answer = "Réponse vide du modèle."
+                    model_used = "mistral_empty_response"
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': answer})}\n\n"
+
+            except Exception as e:
+                logger.error("LLM stream error", error=str(e))
+                answer = "Erreur du moteur IA."
+                model_used = "unavailable"
+                yield f"data: {json.dumps({'type': 'chunk', 'text': answer})}\n\n"
+
+        response = AiResponseSchema(
+            answer=answer,
+            citations=citations,
+            confidenceScore=confidence,
+            domain=input_data.domain,
+            taskType=task_type,
+            generatedAt=datetime.now(timezone.utc).isoformat(),
+            sessionId=input_data.sessionId,
+            hasContext=has_context,
+            modelUsed=model_used,
+        )
+
+        if input_data.sessionId:
+            await self._save_exchange(
+                db=db,
+                session_id=input_data.sessionId,
+                question=input_data.question,
+                response=response,
+            )
+            
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    # =========================
     # ANALYZE (RAG + FILTER)
     # =========================
     async def analyze(
@@ -355,6 +440,94 @@ Réponds uniquement à partir des sources.
             )
 
         return response
+
+    # =========================
+    # ANALYZE STREAM
+    # =========================
+    async def analyze_stream(
+        self,
+        input_data: AiAnalyzeInputSchema,
+        db: DBSession,
+    ):
+        import json
+        
+        query_text = f"{input_data.question}\n{input_data.situation}"
+
+        context_result = await rag_service.get_context(
+            query=query_text,
+            db=db,
+            domain=input_data.domain,
+            limit=settings.max_chunks_per_search,
+        )
+
+        MIN_SCORE = 0.25
+
+        filtered_sources = [
+            s for s in context_result.sources if getattr(s, "score", 0) >= MIN_SCORE
+        ]
+
+        has_context = len(filtered_sources) > 0
+        citations = self._build_citations(filtered_sources)
+        confidence = self._calculate_confidence(len(filtered_sources), has_context)
+        
+        yield f"data: {json.dumps({'type': 'meta', 'citations': [c.model_dump() for c in citations], 'confidence': confidence})}\n\n"
+
+        if not has_context:
+            answer = (
+                "Je ne dispose pas d'informations suffisantes dans les sources officielles "
+                "pour analyser cette situation."
+            )
+            model_used = "fallback"
+            yield f"data: {json.dumps({'type': 'chunk', 'text': answer})}\n\n"
+        else:
+            context_text = "\n\n".join([s.content for s in filtered_sources])
+
+            prompt = await self._build_prompt_with_context(
+                question=input_data.question,
+                context=context_text,
+                task_type="analyze",
+                situation=input_data.situation,
+            )
+            model_used = settings.ollama_llm_model
+            answer = ""
+
+            try:
+                async for chunk in ollama_service.generate_response_stream(prompt, ANALYZE_PROMPT):
+                    answer += chunk
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
+
+                if not answer.strip():
+                    answer = "Réponse vide du modèle."
+                    model_used = "mistral_empty_response"
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': answer})}\n\n"
+
+            except Exception as e:
+                logger.error("Analyze stream error", error=str(e))
+                answer = "Erreur du moteur IA."
+                model_used = "unavailable"
+                yield f"data: {json.dumps({'type': 'chunk', 'text': answer})}\n\n"
+
+        response = AiResponseSchema(
+            answer=answer,
+            citations=citations,
+            confidenceScore=confidence,
+            domain=input_data.domain,
+            taskType="analyze",
+            generatedAt=datetime.now(timezone.utc).isoformat(),
+            sessionId=input_data.sessionId,
+            hasContext=has_context,
+            modelUsed=model_used,
+        )
+
+        if input_data.sessionId:
+            await self._save_exchange(
+                db=db,
+                session_id=input_data.sessionId,
+                question=input_data.question,
+                response=response,
+            )
+            
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
     # =========================
     # SAVE HISTORY
