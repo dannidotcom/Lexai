@@ -8,7 +8,9 @@ import {
   type AiTaskType,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Send, ChevronDown, AlertTriangle, Bot, Loader2, Scale, BookOpen, Sparkles } from "lucide-react";
+import { Plus, Send, ChevronDown, AlertTriangle, Bot, Loader2, Scale, BookOpen, Sparkles, ArrowRight, Pencil } from "lucide-react";
+import { ChatMarkdown } from "@/components/chat-markdown";
+import { ChatUserMessage } from "@/components/chat-user-message";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -39,13 +41,38 @@ const SUGGESTIONS = [
   "Expliquez les taux de cotisations URSSAF 2024",
 ];
 
+const ANALYZE_EXAMPLES: Array<{ question: string; situation: string }> = [
+  {
+    situation:
+      "Un salarié en CDI avec 8 ans d'ancienneté demande une rupture conventionnelle. L'employeur refuse sans justification et propose à la place une démission ou un licenciement pour faute légère.",
+    question:
+      "L'employeur peut-il refuser une demande de rupture conventionnelle et quels sont les risques juridiques en cas de refus abusif ?",
+  },
+  {
+    situation:
+      "Une entreprise de 45 salariés impose le télétravail 4 jours par semaine sans accord d'entreprise ni consultation du CSE.",
+    question:
+      "Cette modification des conditions de travail est-elle licite et quelles sont les obligations de l'employeur ?",
+  },
+];
+
+type AnalyzeStep = "situation" | "question";
+
+function formatSituationMessage(situation: string): string {
+  return `Situation\n${situation}`;
+}
+
+function formatQuestionMessage(question: string): string {
+  return `Question juridique\n${question}`;
+}
+
 const TASK_OPTIONS: Array<{ value: TaskType; label: string; icon: React.ElementType }> = [
   { value: "query", label: "Question", icon: Sparkles },
   { value: "explain", label: "Explication", icon: BookOpen },
   { value: "analyze", label: "Analyse", icon: Scale },
 ];
 
-const DOMAINS = ["travail", "social", "commercial", "fiscal", "civil"];
+const DOMAINS = ["travail", "Social", "commercial", "fiscal", "civil"];
 
 function CitationCard({ citation, index }: { citation: PendingMessage["citations"][number]; index: number }) {
   const score = Math.round(citation.relevanceScore * 100);
@@ -88,22 +115,20 @@ function MessageBubble({ msg }: { msg: PendingMessage }) {
 
   if (msg.role === "user") {
     return (
-      <div className="flex justify-end">
-        <div className="max-w-[78%] bg-sky-500 rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm">
-          <p className="text-[13px] text-white whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-        </div>
+      <div className="flex justify-end w-full">
+        <ChatUserMessage content={msg.content} />
       </div>
     );
   }
 
   return (
-    <div className="flex gap-3 max-w-[88%]">
+    <div className="flex gap-2.5 md:gap-3 w-full max-w-[96%] md:max-w-[90%] lg:max-w-[85%] 2xl:max-w-[80%] min-w-0 items-start">
       <div className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-sky-500 to-sky-600 rounded-xl flex items-center justify-center mt-0.5 shadow-sm">
         <Bot className="w-3.5 h-3.5 text-white" />
       </div>
-      <div className="flex-1 space-y-2 min-w-0">
+      <div className="flex-1 space-y-2 min-w-0 max-w-full">
         {isWaiting ? (
-          <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+          <div className="inline-flex max-w-full items-center gap-2 bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-3 py-2.5 md:px-4 md:py-3 shadow-sm">
             <div className="flex gap-1">
               <div className="dot-1 w-1.5 h-1.5 rounded-full bg-sky-500" />
               <div className="dot-2 w-1.5 h-1.5 rounded-full bg-sky-500" />
@@ -112,11 +137,8 @@ function MessageBubble({ msg }: { msg: PendingMessage }) {
             <span className="text-[11px] text-gray-400">Recherche dans les sources…</span>
           </div>
         ) : (
-          <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-            <p className="text-[13px] text-gray-800 whitespace-pre-wrap leading-[1.7]">
-              {msg.content}
-              {isStreaming && <span className="stream-cursor" aria-hidden />}
-            </p>
+          <div className="w-full bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-3 py-3 md:px-4 md:py-3.5 shadow-sm min-w-0">
+            <ChatMarkdown content={msg.content} streaming={isStreaming} />
             {isStreaming && (
               <p className="text-[10px] text-sky-500/80 mt-2 font-medium">Rédaction en cours…</p>
             )}
@@ -157,6 +179,9 @@ function MessageBubble({ msg }: { msg: PendingMessage }) {
 export default function Chat() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
+  const [situation, setSituation] = useState("");
+  const [committedSituation, setCommittedSituation] = useState("");
+  const [analyzeStep, setAnalyzeStep] = useState<AnalyzeStep>("situation");
   const [taskType, setTaskType] = useState<TaskType>("query");
   const [domain, setDomain] = useState("");
   const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([]);
@@ -183,6 +208,34 @@ export default function Chat() {
   });
 
   const isLoading = isStreaming;
+  const isAnalyzeMode = taskType === "analyze";
+  const isAnalyzeSituationStep = isAnalyzeMode && analyzeStep === "situation";
+  const isAnalyzeQuestionStep = isAnalyzeMode && analyzeStep === "question";
+
+  const canContinueSituation = !isLoading && situation.trim().length > 0;
+  const canSendAnalyze = !isLoading && question.trim().length > 0 && committedSituation.length > 0;
+  const canSendNormal = !isLoading && question.trim().length > 0;
+  const canSend = isAnalyzeSituationStep
+    ? canContinueSituation
+    : isAnalyzeQuestionStep
+      ? canSendAnalyze
+      : canSendNormal;
+
+  const resetAnalyzeFlow = () => {
+    setSituation("");
+    setCommittedSituation("");
+    setAnalyzeStep("situation");
+    setQuestion("");
+  };
+
+  useEffect(() => {
+    if (!isAnalyzeMode) resetAnalyzeFlow();
+  }, [isAnalyzeMode]);
+
+  const handleTaskTypeChange = (value: TaskType) => {
+    setTaskType(value);
+    resetAnalyzeFlow();
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({
@@ -199,23 +252,53 @@ export default function Chat() {
     });
   };
 
+  const handleAnalyzeContinue = () => {
+    if (!canContinueSituation) return;
+    const sit = situation.trim();
+    setCommittedSituation(sit);
+    setSituation("");
+    setAnalyzeStep("question");
+    setPendingMessages(prev => [
+      ...prev,
+      {
+        role: "user",
+        content: formatSituationMessage(sit),
+        citations: [],
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    textareaRef.current?.focus();
+  };
+
   const handleSend = async () => {
-    if (!question.trim() || isLoading) return;
+    if (isAnalyzeSituationStep) {
+      handleAnalyzeContinue();
+      return;
+    }
+    if (!canSend) return;
+
     const q = question.trim();
+    const sit = committedSituation;
     setQuestion("");
     textareaRef.current?.focus();
 
-    const userMsg: PendingMessage = { role: "user", content: q, citations: [], createdAt: new Date().toISOString() };
+    const userMsg: PendingMessage = {
+      role: "user",
+      content: isAnalyzeQuestionStep ? formatQuestionMessage(q) : q,
+      citations: [],
+      createdAt: new Date().toISOString(),
+    };
     const pending: PendingMessage = { role: "assistant", content: "", citations: [], createdAt: new Date().toISOString(), isPending: true };
     setPendingMessages(prev => [...prev, userMsg, pending]);
     setIsStreaming(true);
 
-    const payload = {
+    if (isAnalyzeQuestionStep) resetAnalyzeFlow();
+
+    const streamInput = {
       question: q,
+      situation: isAnalyzeQuestionStep ? sit : undefined,
       domain: domain && domain !== "all" ? domain : undefined,
       sessionId: activeSessionId || undefined,
-      taskType,
-      ...(taskType === "analyze" ? { situation: q } : {}),
     };
 
     abortRef.current?.abort();
@@ -246,7 +329,7 @@ export default function Chat() {
     try {
       content = await consumeAiStream(
         taskType,
-        payload,
+        streamInput,
         {
           onMeta: (event) => {
             citations = event.citations ?? [];
@@ -310,10 +393,10 @@ export default function Chat() {
   const activeTask = TASK_OPTIONS.find(t => t.value === taskType)!;
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-gray-50/50">
+    <div className="flex-1 flex overflow-hidden bg-gray-50/50 min-w-0">
 
       {/* Session sidebar */}
-      <div className="w-[200px] flex-shrink-0 border-r border-gray-200 flex flex-col bg-white">
+      <div className="hidden md:flex w-[200px] flex-shrink-0 border-r border-gray-200 flex-col bg-white">
         <div className="p-3 border-b border-gray-100">
           <Button
             onClick={handleNewSession}
@@ -323,7 +406,7 @@ export default function Chat() {
             disabled={createSession.isPending}
           >
             <Plus className="w-3.5 h-3.5" />
-            Nouvelle session
+            New chat
           </Button>
         </div>
 
@@ -367,16 +450,16 @@ export default function Chat() {
       </div>
 
       {/* Chat area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Toolbar */}
-        <div className="flex-shrink-0 px-4 h-[52px] border-b border-gray-200 bg-white flex items-center gap-2.5">
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+        <div className="flex-shrink-0 px-3 md:px-4 min-h-[52px] border-b border-gray-200 bg-white flex items-center gap-2 py-2 md:py-0 overflow-x-auto">
+          <div className="flex shrink-0 rounded-lg border border-gray-200 overflow-hidden">
             {TASK_OPTIONS.map(opt => {
               const Icon = opt.icon;
               return (
                 <button
                   key={opt.value}
-                  onClick={() => setTaskType(opt.value)}
+                  onClick={() => handleTaskTypeChange(opt.value)}
                   className={cn(
                     "flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition-colors border-r border-gray-200 last:border-0",
                     taskType === opt.value
@@ -392,7 +475,7 @@ export default function Chat() {
           </div>
 
           <Select value={domain} onValueChange={setDomain}>
-            <SelectTrigger className="h-8 text-[11px] w-36 rounded-lg border-gray-200" data-testid="select-domain">
+            <SelectTrigger className="h-8 text-[11px] w-32 md:w-36 rounded-lg border-gray-200" data-testid="select-domain">
               <SelectValue placeholder="Tous les domaines" />
             </SelectTrigger>
             <SelectContent>
@@ -407,7 +490,7 @@ export default function Chat() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+        <div className="flex-1 overflow-y-auto px-3 md:px-5 lg:px-8 py-5 space-y-5 w-full min-w-0">
           {displayMessages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-center gap-5 pb-8">
               <div className="relative">
@@ -425,15 +508,33 @@ export default function Chat() {
                 </p>
               </div>
               <div className="flex flex-col gap-2 w-full max-w-md mt-2">
-                {SUGGESTIONS.map(q => (
-                  <button
-                    key={q}
-                    onClick={() => { setQuestion(q); textareaRef.current?.focus(); }}
-                    className="text-left text-[13px] bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-600 hover:text-gray-900 hover:border-sky-200 hover:bg-sky-50/50 transition-all duration-150 shadow-sm"
-                  >
-                    {q}
-                  </button>
-                ))}
+                {isAnalyzeMode
+                  ? ANALYZE_EXAMPLES.map((ex, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          setCommittedSituation(ex.situation);
+                          setQuestion(ex.question);
+                          setAnalyzeStep("question");
+                          textareaRef.current?.focus();
+                        }}
+                        className="text-left text-[13px] bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-600 hover:text-gray-900 hover:border-sky-200 hover:bg-sky-50/50 transition-all duration-150 shadow-sm space-y-1"
+                      >
+                        <span className="block text-[10px] font-semibold uppercase tracking-wide text-sky-600">Exemple d&apos;analyse</span>
+                        <span className="block line-clamp-2">{ex.situation}</span>
+                      </button>
+                    ))
+                  : SUGGESTIONS.map(q => (
+                      <button
+                        key={q}
+                        type="button"
+                        onClick={() => { setQuestion(q); textareaRef.current?.focus(); }}
+                        className="text-left text-[13px] bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-gray-600 hover:text-gray-900 hover:border-sky-200 hover:bg-sky-50/50 transition-all duration-150 shadow-sm"
+                      >
+                        {q}
+                      </button>
+                    ))}
               </div>
             </div>
           )}
@@ -448,34 +549,127 @@ export default function Chat() {
 
         {/* Input */}
         <div className="flex-shrink-0 px-4 py-3 border-t border-gray-200 bg-white">
-          <div className="flex gap-2 items-end max-w-4xl">
-            <Textarea
-              ref={textareaRef}
-              data-testid="input-question"
-              placeholder={`Mode ${activeTask.label.toLowerCase()} — posez votre question… (⏎ pour envoyer)`}
-              value={question}
-              onChange={e => setQuestion(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
-              }}
-              className="flex-1 resize-none min-h-[52px] max-h-[140px] text-[13px] rounded-xl border-gray-200 focus:border-sky-400 transition-colors"
-              disabled={isLoading}
-            />
-            <Button
-              onClick={handleSend}
-              disabled={!question.trim() || isLoading}
-              data-testid="button-send"
-              size="icon"
-              className="h-[52px] w-[52px] rounded-xl flex-shrink-0 bg-sky-500 hover:bg-sky-600 border-0 shadow-sm shadow-sky-200"
-            >
-              {isLoading
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <Send className="w-4 h-4" />}
-            </Button>
+          <div className="max-w-3xl mx-auto w-full">
+            {isAnalyzeQuestionStep && committedSituation && (
+              <div className="mb-2 flex items-start gap-2 rounded-xl border border-sky-100 bg-sky-50/60 px-3 py-2.5">
+                <Scale className="w-3.5 h-3.5 text-sky-600 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-700 mb-0.5">
+                    Situation enregistrée
+                  </p>
+                  <p className="text-[12px] text-gray-700 line-clamp-2 leading-relaxed">{committedSituation}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSituation(committedSituation);
+                    setCommittedSituation("");
+                    setAnalyzeStep("situation");
+                    setPendingMessages(prev => {
+                      const last = prev[prev.length - 1];
+                      if (last?.role === "user" && last.content.startsWith("Situation\n")) {
+                        return prev.slice(0, -1);
+                      }
+                      return prev;
+                    });
+                  }}
+                  className="flex items-center gap-1 text-[10px] text-sky-600 hover:text-sky-800 font-medium flex-shrink-0"
+                >
+                  <Pencil className="w-3 h-3" />
+                  Modifier
+                </button>
+              </div>
+            )}
+
+            {isAnalyzeMode && (
+              <div className="flex items-center gap-2 mb-2">
+                <span
+                  className={cn(
+                    "text-[10px] font-semibold px-2 py-0.5 rounded-full",
+                    isAnalyzeSituationStep ? "bg-sky-100 text-sky-700" : "bg-gray-100 text-gray-500",
+                  )}
+                >
+                  1. Situation
+                </span>
+                <div className="h-px flex-1 bg-gray-200 max-w-[40px]" />
+                <span
+                  className={cn(
+                    "text-[10px] font-semibold px-2 py-0.5 rounded-full",
+                    isAnalyzeQuestionStep ? "bg-sky-100 text-sky-700" : "bg-gray-100 text-gray-400",
+                  )}
+                >
+                  2. Question
+                </span>
+              </div>
+            )}
+
+            <div className="flex gap-2 items-end">
+              <div className="flex-1 rounded-2xl border border-gray-200 bg-gray-50/50 focus-within:border-sky-300 focus-within:ring-2 focus-within:ring-sky-100 transition-all overflow-hidden">
+                {isAnalyzeSituationStep ? (
+                  <Textarea
+                    id="input-situation"
+                    data-testid="input-situation"
+                    placeholder="Décrivez la situation : faits, contexte, acteurs, dates…"
+                    value={situation}
+                    onChange={e => setSituation(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleAnalyzeContinue();
+                      }
+                    }}
+                    className="resize-none min-h-[88px] max-h-[200px] text-[13px] border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none px-4 py-3"
+                    disabled={isLoading}
+                  />
+                ) : (
+                  <Textarea
+                    ref={textareaRef}
+                    id="input-question"
+                    data-testid="input-question"
+                    placeholder={
+                      isAnalyzeQuestionStep
+                        ? "Posez votre question juridique sur cette situation…"
+                        : `Mode ${activeTask.label.toLowerCase()} — posez votre question…`
+                    }
+                    value={question}
+                    onChange={e => setQuestion(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    className="resize-none min-h-[56px] max-h-[160px] text-[13px] border-0 bg-transparent shadow-none focus-visible:ring-0 rounded-none px-4 py-3"
+                    disabled={isLoading}
+                  />
+                )}
+              </div>
+              <Button
+                onClick={handleSend}
+                disabled={!canSend}
+                data-testid={isAnalyzeSituationStep ? "button-continue-situation" : "button-send"}
+                className="h-[52px] min-w-[52px] rounded-xl flex-shrink-0 bg-sky-500 hover:bg-sky-600 border-0 shadow-sm shadow-sky-200 gap-1.5 px-4"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : isAnalyzeSituationStep ? (
+                  <>
+                    <span className="text-[12px] font-medium hidden sm:inline">Continuer</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-2 text-center sm:text-left">
+              {isAnalyzeSituationStep
+                ? "Étape 1/2 — Décrivez la situation puis continuez"
+                : isAnalyzeQuestionStep
+                  ? "Étape 2/2 — Posez votre question juridique · Maj+Entrée nouvelle ligne"
+                  : "Sources officielles uniquement · Maj+Entrée pour nouvelle ligne"}
+            </p>
           </div>
-          <p className="text-[10px] text-gray-400 mt-2">
-            Sources officielles uniquement · Maj+Entrée pour nouvelle ligne
-          </p>
         </div>
       </div>
     </div>

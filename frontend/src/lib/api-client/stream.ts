@@ -25,8 +25,38 @@ export interface AiQueryPayload {
   taskType?: AiTaskType;
 }
 
-export interface AiAnalyzePayload extends AiQueryPayload {
+/** Payload attendu par POST /api/ai/analyze/stream */
+export interface AiAnalyzePayload {
+  question: string;
   situation: string;
+  domain?: string;
+  subDomain?: string;
+  sessionId?: string;
+}
+
+export function buildAiStreamPayload(
+  taskType: AiTaskType,
+  input: {
+    question: string;
+    situation?: string;
+    domain?: string;
+    sessionId?: string;
+  },
+): AiQueryPayload | AiAnalyzePayload {
+  const base = {
+    question: input.question,
+    domain: input.domain,
+    sessionId: input.sessionId,
+  };
+
+  if (taskType === "analyze") {
+    if (!input.situation?.trim()) {
+      throw new Error("Le champ situation est requis pour le mode analyse.");
+    }
+    return { ...base, situation: input.situation.trim() };
+  }
+
+  return { ...base, taskType };
 }
 
 export function getAiStreamEndpoint(taskType: AiTaskType): string {
@@ -77,11 +107,17 @@ function parseSseEvents(buffer: string): { events: AiStreamEvent[]; remainder: s
 /** POST SSE stream from AI stream endpoints (query, explain, analyze) */
 export async function consumeAiStream(
   taskType: AiTaskType,
-  payload: AiQueryPayload | AiAnalyzePayload,
+  input: {
+    question: string;
+    situation?: string;
+    domain?: string;
+    sessionId?: string;
+  },
   callbacks: AiStreamCallbacks,
   signal?: AbortSignal,
 ): Promise<string> {
   const endpoint = getAiStreamEndpoint(taskType);
+  const payload = buildAiStreamPayload(taskType, input);
   const res = await fetch(apiUrl(endpoint), {
     method: "POST",
     headers: {

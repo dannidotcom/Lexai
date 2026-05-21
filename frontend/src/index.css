@@ -223,6 +223,21 @@
     animation: stream-cursor 0.8s step-end infinite;
   }
 
+  .chat-prose {
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
+  .chat-prose :where(p, li, h2, h3, h4, code, strong) {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .chat-prose :where(ul, ol) {
+    max-width: 100%;
+    padding-right: 0.25rem;
+  }
+
   /* ── Shimmer ─── */
   @keyframes shimmer {
     0%   { background-position: -200% 0; }
