@@ -1,5 +1,7 @@
 import os
+from typing import Any
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -21,6 +23,13 @@ class Settings(BaseSettings):
     chunk_overlap: int = 200
     max_chunks_per_search: int = 5
     ai_timeout_seconds: int = 300
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def parse_debug(cls, value: Any) -> Any:
+        if isinstance(value, str) and value.strip().lower() in {"release", "prod", "production"}:
+            return False
+        return value
 
     class Config:
         env_file = ".env"

@@ -4,7 +4,7 @@ from app.core.database import get_db
 from app.models.schemas import SearchInputSchema, SearchResultSchema, ContextResultSchema
 from app.services.rag_service import rag_service
 
-router = APIRouter(prefix="/rag", tags=["rag"])
+router = APIRouter(prefix="/rag", tags=["RAG Search and Context"])
 
 
 @router.post("/search", response_model=SearchResultSchema)

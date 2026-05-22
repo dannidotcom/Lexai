@@ -4,7 +4,7 @@ from app.core.database import get_db
 from app.services.pdf_ingest_service import pdf_ingest_service
 from app.models.schemas import DocumentSchema
 
-router = APIRouter(prefix="/documents", tags=["documents"])
+router = APIRouter(prefix="/documents", tags=["Documents and Ingestion"])
 
 
 @router.post("/upload-pdf", response_model=DocumentSchema)

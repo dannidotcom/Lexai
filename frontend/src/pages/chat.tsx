@@ -72,7 +72,7 @@ const TASK_OPTIONS: Array<{ value: TaskType; label: string; icon: React.ElementT
   { value: "analyze", label: "Analyse", icon: Scale },
 ];
 
-const DOMAINS = ["travail", "Social", "commercial", "fiscal", "civil"];
+const DOMAINS = ["travail", "social", "commercial", "fiscal", "civil"];
 
 function CitationCard({ citation, index }: { citation: PendingMessage["citations"][number]; index: number }) {
   const score = Math.round(citation.relevanceScore * 100);

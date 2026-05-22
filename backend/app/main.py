@@ -7,6 +7,7 @@ from app.core.database import init_db
 from app.services.vector_store import vector_store
 from app.routers import health, documents, rag, ai, stats
 from app.routers import pdf_upload
+from app.routers import php_ai_adapter
 
 
 @asynccontextmanager
@@ -50,3 +51,4 @@ app.include_router(rag.router, prefix="/api")
 app.include_router(ai.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
 app.include_router(pdf_upload.router, prefix="/api")
+app.include_router(php_ai_adapter.router, prefix="/api")

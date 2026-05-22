@@ -10,7 +10,7 @@ from app.services.document_service import document_service
 from app.services.legifrance_parser import parse_kali_json, kali_to_ingest_batches
 from app.core.logging import logger
 
-router = APIRouter(prefix="/documents", tags=["documents"])
+router = APIRouter(prefix="/documents", tags=["Documents and Ingestion"])
 
 
 @router.get("", response_model=List[DocumentSchema])

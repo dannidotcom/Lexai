@@ -121,6 +121,28 @@ Ce document décrit les endpoints HTTP exposés par l'API FastAPI du backend Lex
 
 ---
 
+## PHP AI Adapter (`/adapter/ai`)
+
+- **POST /adapter/ai/query**
+  - Description : Point d'entree unique pour les appels PHP de question/reponse metier. Normalise la requete PHP, applique un timeout, transmet au moteur IA/RAG et renvoie une reponse standardisee.
+  - Body : `domaine`, `sous_domaine`, `question`, `contexte_metier`, `type_tache`, `limite_sources`, `session_id`, `async_request`.
+  - Reponse : `{ request_id, status, progression, success, response, error, created_at, completed_at }`.
+  - Effet : appelle le pipeline IA existant derriere `/api/ai/query`; aucun module PHP ne doit appeler directement `/api/ai/*`.
+
+- **POST /adapter/ai/analyze**
+  - Description : Point d'entree unique pour les analyses PHP de document ou texte. Normalise le payload, transmet au moteur IA/RAG d'analyse et renvoie une analyse structuree.
+  - Body : `domaine`, `sous_domaine`, `question`, `document` ou `texte`, `contexte_metier`, `limite_sources`, `session_id`, `async_request`.
+  - Reponse : `{ request_id, status, progression, success, response, error, created_at, completed_at }`.
+  - Effet : appelle le pipeline IA existant derriere `/api/ai/analyze`.
+
+- **GET /adapter/ai/status/{request_id}**
+  - Description : Suivi d'une requete PHP synchrone ou asynchrone creee par l'adapter.
+  - Params : `request_id` (path)
+  - Reponse : statut (`pending`, `running`, `completed`, `failed`, `timeout`), progression, reponse complete si disponible.
+  - Effet : lecture du registre de suivi en memoire du backend.
+
+---
+
 ## Stats (`/api/stats`)
 
 - **GET /api/stats/dashboard**

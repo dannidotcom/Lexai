@@ -124,6 +124,7 @@ class AiQueryInputSchema(BaseModel):
     subDomain: Optional[str] = None
     sessionId: Optional[str] = None
     taskType: TaskType = TaskType.QUERY
+    limitSources: Optional[int] = Field(default=None, ge=1, le=20)
 
 
 class AiAnalyzeInputSchema(BaseModel):
@@ -132,6 +133,7 @@ class AiAnalyzeInputSchema(BaseModel):
     domain: Optional[str] = None
     subDomain: Optional[str] = None
     sessionId: Optional[str] = None
+    limitSources: Optional[int] = Field(default=None, ge=1, le=20)
 
 
 class CitationSchema(BaseModel):

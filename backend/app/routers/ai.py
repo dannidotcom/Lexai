@@ -11,7 +11,7 @@ from app.models.db_models import Session as SessionModel, Message
 from app.services.ai_service import ai_service
 from datetime import datetime, timezone
 
-router = APIRouter(prefix="/ai", tags=["ai"])
+router = APIRouter(prefix="/ai", tags=["AI Interactions"])
 
 
 @router.post("/query", response_model=AiResponseSchema)

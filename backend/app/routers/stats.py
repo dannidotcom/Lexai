@@ -8,7 +8,7 @@ from app.models.db_models import Document, Chunk, Session as SessionModel, Messa
 from app.services.ollama_service import ollama_service
 from app.services.vector_store import vector_store
 
-router = APIRouter(prefix="/stats", tags=["stats"])
+router = APIRouter(prefix="/stats", tags=["Statistics and Dashboard"])
 
 
 @router.get("/dashboard", response_model=DashboardStatsSchema)

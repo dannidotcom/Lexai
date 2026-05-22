@@ -6,7 +6,7 @@ from app.models.schemas import HealthStatusSchema, OllamaStatusSchema
 from app.services.ollama_service import ollama_service
 from app.services.vector_store import vector_store
 
-router = APIRouter(tags=["health"])
+router = APIRouter(tags=["Health and Status"])
 
 
 @router.get("/healthz", response_model=HealthStatusSchema)

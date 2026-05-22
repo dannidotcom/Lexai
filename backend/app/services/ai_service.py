@@ -205,7 +205,7 @@ Réponds uniquement à partir des sources.
             query=input_data.question,
             db=db,
             domain=input_data.domain,
-            limit=settings.max_chunks_per_search,
+            limit=input_data.limitSources or settings.max_chunks_per_search,
         )
 
         has_context = len(context_result.sources) > 0
@@ -290,7 +290,7 @@ Réponds uniquement à partir des sources.
             query=input_data.question,
             db=db,
             domain=input_data.domain,
-            limit=settings.max_chunks_per_search,
+            limit=input_data.limitSources or settings.max_chunks_per_search,
         )
 
         has_context = len(context_result.sources) > 0
@@ -370,7 +370,7 @@ Réponds uniquement à partir des sources.
             query=query_text,
             db=db,
             domain=input_data.domain,
-            limit=settings.max_chunks_per_search,
+            limit=input_data.limitSources or settings.max_chunks_per_search,
         )
 
         MIN_SCORE = 0.25
@@ -457,7 +457,7 @@ Réponds uniquement à partir des sources.
             query=query_text,
             db=db,
             domain=input_data.domain,
-            limit=settings.max_chunks_per_search,
+            limit=input_data.limitSources or settings.max_chunks_per_search,
         )
 
         MIN_SCORE = 0.25
