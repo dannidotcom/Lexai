@@ -32,8 +32,24 @@ class UserRepository:
     async def get_by_id(self, user_id: uuid.UUID) -> User | None:
         return await self.session.get(User, user_id)
 
-    async def create(self, *, email: str, hashed_password: str, full_name: str | None) -> User:
-        user = User(email=email.lower(), hashed_password=hashed_password, full_name=full_name, role=UserRole.USER)
+    async def create(
+        self,
+        *,
+        email: str,
+        hashed_password: str,
+        full_name: str | None,
+        role: UserRole = UserRole.USER,
+        is_active: bool = True,
+        is_verified: bool = False,
+    ) -> User:
+        user = User(
+            email=email.lower(),
+            hashed_password=hashed_password,
+            full_name=full_name,
+            role=role,
+            is_active=is_active,
+            is_verified=is_verified,
+        )
         self.session.add(user)
         await self.session.flush()
         return user

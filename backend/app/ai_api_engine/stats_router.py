@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.db_models import Chunk, Document, Message, Session as SessionModel
-from backend.app.schemas.schemas import DashboardStatsSchema, DomainStatSchema
+from app.schemas.schemas import DashboardStatsSchema, DomainStatSchema
 from app.modules.rag_vecor_engine.infrastructure import vector_store
 from app.shared.ollama_service import ollama_service
 

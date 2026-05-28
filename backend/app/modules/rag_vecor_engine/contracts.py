@@ -1,4 +1,4 @@
-from backend.app.schemas.schemas import (
+from app.schemas.schemas import (
     ChunkSchema,
     DocumentInputSchema,
     DocumentSchema,

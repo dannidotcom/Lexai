@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.logging import logger
-from backend.app.schemas.schemas import (
+from app.schemas.schemas import (
     ChunkSchema,
     DocumentInputSchema,
     DocumentSchema,

@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.logging import logger
-from backend.app.schemas.schemas import AiAnalyzeInputSchema, AiQueryInputSchema, AiResponseSchema, TaskType
+from app.schemas.schemas import AiAnalyzeInputSchema, AiQueryInputSchema, AiResponseSchema, TaskType
 from app.modules.ai_generation_engine.application import ai_service
 
 

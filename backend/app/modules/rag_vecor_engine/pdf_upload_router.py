@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from backend.app.schemas.schemas import DocumentSchema
+from app.schemas.schemas import DocumentSchema
 from app.modules.rag_vecor_engine.application import pdf_ingest_service
 
 router = APIRouter(prefix="/documents", tags=["Documents and Ingestion"])

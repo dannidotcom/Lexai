@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import check_db, get_db
-from backend.app.schemas.schemas import HealthStatusSchema, OllamaStatusSchema
+from app.schemas.schemas import HealthStatusSchema, OllamaStatusSchema
 from app.modules.rag_vecor_engine.infrastructure import vector_store
 from app.shared.ollama_service import ollama_service
 

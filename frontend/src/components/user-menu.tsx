@@ -98,7 +98,7 @@ export function UserMenu({ className }: { className?: string }) {
         </DropdownMenuItem>
 
         {user.role === "ADMIN" && (
-          <DropdownMenuItem onClick={() => navigate("/admin")} className="cursor-pointer rounded-lg">
+          <DropdownMenuItem onClick={() => navigate("/admin/users")} className="cursor-pointer rounded-lg">
             <ShieldCheck className="h-4 w-4" />
             Espace admin
           </DropdownMenuItem>

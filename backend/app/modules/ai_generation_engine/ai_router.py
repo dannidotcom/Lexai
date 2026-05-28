@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.db_models import Message, Session as SessionModel
-from backend.app.schemas.schemas import AiAnalyzeInputSchema, AiQueryInputSchema, AiResponseSchema, MessageSchema, SessionInputSchema, SessionSchema
+from app.schemas.schemas import AiAnalyzeInputSchema, AiQueryInputSchema, AiResponseSchema, MessageSchema, SessionInputSchema, SessionSchema
 from app.modules.ai_generation_engine.application import ai_service
 
 router = APIRouter(prefix="/ai", tags=["AI Interactions"])
@@ -27,7 +27,7 @@ async def ai_query_stream(data: AiQueryInputSchema, db: Session = Depends(get_db
 
 @router.post("/explain", response_model=AiResponseSchema)
 async def ai_explain(data: AiQueryInputSchema, db: Session = Depends(get_db)):
-    from backend.app.schemas.schemas import TaskType
+    from app.schemas.schemas import TaskType
 
     data.taskType = TaskType.EXPLAIN
     return await ai_service.query(data, db)
@@ -35,7 +35,7 @@ async def ai_explain(data: AiQueryInputSchema, db: Session = Depends(get_db)):
 
 @router.post("/explain/stream")
 async def ai_explain_stream(data: AiQueryInputSchema, db: Session = Depends(get_db)):
-    from backend.app.schemas.schemas import TaskType
+    from app.schemas.schemas import TaskType
 
     data.taskType = TaskType.EXPLAIN
     return StreamingResponse(
@@ -97,7 +97,7 @@ def get_session_messages(sessionId: str, db: Session = Depends(get_db)):
     messages = db.query(Message).filter(Message.session_id == sessionId).order_by(Message.created_at).all()
     result = []
     for m in messages:
-        from backend.app.schemas.schemas import CitationSchema
+        from app.schemas.schemas import CitationSchema
 
         citations = []
         if m.citations:

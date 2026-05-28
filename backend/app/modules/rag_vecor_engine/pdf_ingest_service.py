@@ -8,7 +8,7 @@ from pypdf import PdfReader
 from sqlalchemy.orm import Session as DBSession
 
 from app.core.logging import logger
-from backend.app.schemas.schemas import DocumentInputSchema
+from app.schemas.schemas import DocumentInputSchema
 from app.modules.rag_vecor_engine.document_service import document_service
 
 

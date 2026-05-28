@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session as DBSession
 from app.core.config import settings
 from app.core.logging import logger
 from app.models.db_models import Message, Session
-from backend.app.schemas.schemas import (
+from app.schemas.schemas import (
     AiAnalyzeInputSchema,
     AiQueryInputSchema,
     AiResponseSchema,

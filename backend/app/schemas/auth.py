@@ -2,7 +2,7 @@ import re
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from app.models.auth import UserRole
 
@@ -91,6 +91,59 @@ class VerifyEmailRequest(BaseModel):
 
 class AdminUserRead(UserRead):
     last_login_at: datetime | None
+
+
+class AdminUserCreateRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=12, max_length=128)
+    confirm_password: str = Field(min_length=12, max_length=128)
+    full_name: str | None = Field(default=None, min_length=2, max_length=160)
+    role: UserRole = UserRole.USER
+    is_active: bool = True
+    is_verified: bool = False
+
+    @field_validator("password")
+    @classmethod
+    def strong_password(cls, value: str) -> str:
+        if not PASSWORD_PATTERN.match(value):
+            raise ValueError("Password must contain upper, lower, digit, special character and be at least 12 chars")
+        return value
+
+    @field_validator("confirm_password")
+    @classmethod
+    def passwords_match(cls, value: str, info):
+        if "password" in info.data and value != info.data["password"]:
+            raise ValueError("Passwords do not match")
+        return value
+
+
+class AdminUserUpdateRequest(BaseModel):
+    email: EmailStr | None = None
+    full_name: str | None = Field(default=None, min_length=2, max_length=160)
+    password: str | None = Field(default=None, min_length=12, max_length=128)
+    confirm_password: str | None = Field(default=None, min_length=12, max_length=128)
+    role: UserRole | None = None
+    is_active: bool | None = None
+    is_verified: bool | None = None
+
+    @field_validator("password")
+    @classmethod
+    def strong_password(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        if not PASSWORD_PATTERN.match(value):
+            raise ValueError("Password must contain upper, lower, digit, special character and be at least 12 chars")
+        return value
+
+    @model_validator(mode="after")
+    def validate_password_update(self):
+        if self.password is None and self.confirm_password is None:
+            return self
+        if not self.password or not self.confirm_password:
+            raise ValueError("Both password and confirm_password are required to update password")
+        if self.password != self.confirm_password:
+            raise ValueError("Passwords do not match")
+        return self
 
 
 class SessionRead(BaseModel):

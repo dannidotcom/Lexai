@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session as DBSession
 
 from app.core.logging import logger
 from app.models.db_models import Chunk, Document
-from backend.app.schemas.schemas import ContextResultSchema, SearchResultItemSchema, SearchResultSchema
+from app.schemas.schemas import ContextResultSchema, SearchResultItemSchema, SearchResultSchema
 from app.modules.rag_vecor_engine.infrastructure import vector_store
 from app.shared.ollama_service import ollama_service
 

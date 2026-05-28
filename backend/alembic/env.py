@@ -4,7 +4,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
-from backend.app.core.session import AuthBase
+from app.core.session import AuthBase
 from app.models.auth import AuditLog, BlacklistedToken, EmailVerificationToken, PasswordResetToken, RefreshToken, User, UserSession
 
 config = context.config

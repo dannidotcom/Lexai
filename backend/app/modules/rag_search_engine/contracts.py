@@ -2,7 +2,7 @@ from typing import Optional, Protocol
 
 from sqlalchemy.orm import Session as DBSession
 
-from backend.app.schemas.schemas import ContextResultSchema, SearchInputSchema, SearchResultSchema, SearchType
+from app.schemas.schemas import ContextResultSchema, SearchInputSchema, SearchResultSchema, SearchType
 
 
 class SearchContextPort(Protocol):

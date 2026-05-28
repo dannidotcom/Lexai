@@ -3,7 +3,7 @@ from typing import Optional, Protocol
 
 from sqlalchemy.orm import Session as DBSession
 
-from backend.app.schemas.schemas import (
+from app.schemas.schemas import (
     AiAnalyzeInputSchema,
     AiQueryInputSchema,
     AiResponseSchema,

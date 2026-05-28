@@ -127,7 +127,7 @@ export function AiSidebar() {
     { label: "Workspace", path: "/dashboard", icon: LayoutDashboard },
     { label: "Agents", path: "/dashboard", icon: Bot },
     { label: "Knowledge", path: "/dashboard", icon: Database },
-    { label: "Admin", path: "/admin", icon: ShieldCheck },
+    { label: "Admin", path: "/admin/users", icon: ShieldCheck },
   ];
 
   return (

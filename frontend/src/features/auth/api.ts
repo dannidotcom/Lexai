@@ -1,7 +1,7 @@
 import axios, { AxiosError, AxiosHeaders } from "axios";
 import { useAuthStore } from "@/stores/auth-store";
 
-export type Role = "USER" | "ADMIN";
+export type Role = "USER" | "ADMIN" | "CUSTOM";
 
 export type User = {
   id: string;
@@ -12,6 +12,10 @@ export type User = {
   is_verified: boolean;
   created_at: string;
   updated_at: string;
+};
+
+export type AdminUser = User & {
+  last_login_at: string | null;
 };
 
 export type TokenResponse = {

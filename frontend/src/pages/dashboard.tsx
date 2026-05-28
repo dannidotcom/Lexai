@@ -1,6 +1,6 @@
 import { useGetDashboardStats, useGetDomainStats, useGetOllamaStatus } from "@workspace/api-client-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { AlertTriangle, CheckCircle2, Database, FileText, Hash, MessageSquare, Search, TrendingUp, Zap } from "lucide-react";
+import { AlertTriangle, Database, FileText, Hash, MessageSquare, Search, TrendingUp, Zap } from "lucide-react";
 import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -300,6 +300,7 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
       </div>
     </div>
   );

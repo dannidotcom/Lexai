@@ -1,4 +1,4 @@
-from backend.app.core.session import AsyncSessionLocal, AuthBase, async_engine, get_async_session, init_auth_db
+from app.core.session import AsyncSessionLocal, AuthBase, async_engine, get_async_session, init_auth_db
 from app.modules.auth_engine.email_service import EmailService, email_service
 from app.modules.auth_engine.repositories import AuditRepository, SessionRepository, TokenRepository, UserRepository
 from app.modules.auth_engine.security import (

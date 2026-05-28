@@ -1,7 +1,7 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from backend.app.core.session import AsyncSessionLocal, init_auth_db
+from app.core.session import AsyncSessionLocal, init_auth_db
 from app.main import app
 from app.models.auth import User, UserRole
 from app.modules.auth_engine.security import hash_password

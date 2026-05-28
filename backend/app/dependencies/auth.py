@@ -12,7 +12,15 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
     UserRole.USER: {"auth:me", "sessions:read", "sessions:revoke_own"},
-    UserRole.ADMIN: {"auth:me", "sessions:read", "sessions:revoke_own", "admin:users:read", "admin:users:delete"},
+    UserRole.ADMIN: {
+        "auth:me",
+        "sessions:read",
+        "sessions:revoke_own",
+        "admin:users:read",
+        "admin:users:create",
+        "admin:users:update",
+        "admin:users:delete",
+    },
     UserRole.CUSTOM: set(),
 }
 

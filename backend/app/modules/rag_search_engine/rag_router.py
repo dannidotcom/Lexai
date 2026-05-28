@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from backend.app.schemas.schemas import ContextResultSchema, SearchInputSchema, SearchResultSchema
+from app.schemas.schemas import ContextResultSchema, SearchInputSchema, SearchResultSchema
 from app.modules.rag_search_engine.application import rag_service
 
 router = APIRouter(prefix="/rag", tags=["RAG Search and Context"])

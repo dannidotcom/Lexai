@@ -6,13 +6,13 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ProtectedRoute } from "@/features/auth/components/protected-route";
 import { authApi, TokenResponse, User } from "@/features/auth/api";
-import AdminDashboardPage from "@/features/auth/pages/admin-dashboard";
 import ForgotPasswordPage from "@/features/auth/pages/forgot-password";
 import LoginPage from "@/features/auth/pages/login";
 import RegisterPage from "@/features/auth/pages/register";
 import ResetPasswordPage from "@/features/auth/pages/reset-password";
 import VerifyEmailPage from "@/features/auth/pages/verify-email";
 import WelcomePage from "@/features/auth/pages/welcome";
+import AdminUsersPage from "@/pages/admin-users";
 import ChatPage from "@/pages/chat";
 import DashboardPage from "@/pages/dashboard";
 import DocumentIngestPage from "@/pages/document-ingest";
@@ -79,6 +79,7 @@ function App() {
 
             <Route element={<ProtectedAppLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/admin/users" element={<AdminUsersPage />} />
               <Route path="/chat" element={<ChatPage />} />
               <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/documents/ingest" element={<DocumentIngestPage />} />
@@ -87,7 +88,7 @@ function App() {
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
 
-            <Route path="/admin" element={<ProtectedRoute roles={["ADMIN"]}><AdminDashboardPage /></ProtectedRoute>} />
+            <Route path="/admin" element={<Navigate to="/admin/users" replace />} />
             <Route path="/me" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
