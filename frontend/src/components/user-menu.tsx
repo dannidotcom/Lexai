@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronsUpDown, LogOut, Settings, ShieldCheck, UserCircle2 } from "lucide-react";
+import { ChevronsUpDown, LogOut, Settings, ShieldCheck, SlidersHorizontal, UserCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -98,10 +98,16 @@ export function UserMenu({ className }: { className?: string }) {
         </DropdownMenuItem>
 
         {user.role === "ADMIN" && (
-          <DropdownMenuItem onClick={() => navigate("/admin/users")} className="cursor-pointer rounded-lg">
-            <ShieldCheck className="h-4 w-4" />
-            Espace admin
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem onClick={() => navigate("/admin/users")} className="cursor-pointer rounded-lg">
+              <ShieldCheck className="h-4 w-4" />
+              Espace admin
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/admin/prompts")} className="cursor-pointer rounded-lg">
+              <SlidersHorizontal className="h-4 w-4" />
+              Parametrage prompts
+            </DropdownMenuItem>
+          </>
         )}
 
         <DropdownMenuSeparator />

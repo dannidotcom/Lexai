@@ -13,6 +13,7 @@ import ResetPasswordPage from "@/features/auth/pages/reset-password";
 import VerifyEmailPage from "@/features/auth/pages/verify-email";
 import WelcomePage from "@/features/auth/pages/welcome";
 import AdminUsersPage from "@/pages/admin-users";
+import AdminPromptsPage from "@/pages/admin-prompts";
 import ChatPage from "@/pages/chat";
 import DashboardPage from "@/pages/dashboard";
 import DocumentIngestPage from "@/pages/document-ingest";
@@ -80,6 +81,7 @@ function App() {
             <Route element={<ProtectedAppLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/admin/users" element={<AdminUsersPage />} />
+              <Route path="/admin/prompts" element={<AdminPromptsPage />} />
               <Route path="/chat" element={<ChatPage />} />
               <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/documents/ingest" element={<DocumentIngestPage />} />

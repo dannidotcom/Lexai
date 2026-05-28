@@ -2,15 +2,23 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   Scale, MessageSquare, Database, Search, Settings,
-  Upload, Menu, X, ChevronRight,
+  Upload, Menu, X, ChevronRight, SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useHealthCheck } from "@workspace/api-client-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAuthStore } from "@/stores/auth-store";
 
 const STORAGE_KEY = "lexia-sidebar-collapsed";
 
-const navigation = [
+type NavigationItem = {
+  name: string;
+  href: string;
+  icon: React.ElementType;
+  section: "main" | "bottom";
+};
+
+const BASE_NAVIGATION: NavigationItem[] = [
   { name: "Dashboard",    href: "/dashboard",        icon: Scale,         section: "main" },
   { name: "Chat Engine",  href: "/chat",             icon: MessageSquare, section: "main" },
   { name: "Bibliothèque", href: "/documents",        icon: Database,      section: "main" },
@@ -19,13 +27,24 @@ const navigation = [
   { name: "Paramètres",   href: "/settings",         icon: Settings,      section: "bottom" },
 ];
 
-const mainNav    = navigation.filter(n => n.section === "main");
-const bottomNav  = navigation.filter(n => n.section === "bottom");
+const ADMIN_PROMPT_NAVIGATION: NavigationItem = {
+  name: "Prompts IA",
+  href: "/admin/prompts",
+  icon: SlidersHorizontal,
+  section: "bottom",
+};
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   const { data: health } = useHealthCheck();
+  const { user } = useAuthStore();
   const isOk = health?.status === "ok";
+
+  const mainNav = BASE_NAVIGATION.filter((item) => item.section === "main");
+  const bottomNav = [
+    ...BASE_NAVIGATION.filter((item) => item.section === "bottom"),
+    ...(user?.role === "ADMIN" ? [ADMIN_PROMPT_NAVIGATION] : []),
+  ];
 
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(STORAGE_KEY) === "true"; } catch { return false; }
@@ -46,7 +65,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(`${href}/`);
 
-  const NavItem = ({ item }: { item: typeof navigation[number] }) => {
+  const NavItem = ({ item }: { item: NavigationItem }) => {
     const active = isActive(item.href);
     const Icon = item.icon;
 
