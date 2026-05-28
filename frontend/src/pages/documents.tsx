@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useListDocuments, useDeleteDocument, getListDocumentsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link } from "react-router-dom";
 import { FileText, Plus, Trash2, ChevronDown, ExternalLink, Calendar, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,7 +69,7 @@ export default function Documents() {
             {docs?.length ?? 0} document{(docs?.length ?? 0) !== 1 ? "s" : ""} indexé{(docs?.length ?? 0) !== 1 ? "s" : ""}
           </p>
         </div>
-        <Link href="/documents/ingest">
+        <Link to="/documents/ingest">
           <Button data-testid="button-ingest" size="sm"
             className="gap-2 rounded-lg h-8 text-[12px] bg-sky-500 hover:bg-sky-600 border-0 shadow-sm shadow-sky-100">
             <Plus className="w-3.5 h-3.5" />
@@ -143,7 +143,7 @@ export default function Documents() {
               </div>
               <p className="text-[13px] font-medium text-gray-400">Aucun document trouvé</p>
               <p className="text-[12px] text-gray-400 mt-1">Importez un document pour commencer</p>
-              <Link href="/documents/ingest">
+              <Link to="/documents/ingest">
                 <Button variant="outline" size="sm" className="mt-4 rounded-lg text-[12px] h-8 border-gray-200">
                   Importer un document
                 </Button>

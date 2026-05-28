@@ -23,7 +23,7 @@ export default function LoginPage() {
       const { data } = await authApi.post<TokenResponse>("/auth/login", values);
       setSession(data.user, data.access_token);
       toast.success("Session ouverte");
-      navigate(data.user.role === "ADMIN" ? "/admin" : "/dashboard");
+      navigate("/dashboard", { replace: true });
     } catch (error) {
       toast.error(apiError(error));
     }

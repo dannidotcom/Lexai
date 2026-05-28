@@ -1,6 +1,7 @@
 import { useGetDashboardStats, useGetDomainStats, useGetOllamaStatus } from "@workspace/api-client-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { AlertTriangle, CheckCircle2, Database, FileText, Hash, MessageSquare, Search, Zap, TrendingUp } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Database, FileText, Hash, MessageSquare, Search, TrendingUp, Zap } from "lucide-react";
+import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -101,19 +102,23 @@ export default function Dashboard() {
           <h1 className="text-[20px] font-semibold text-gray-900 leading-none">Tableau de bord</h1>
           <p className="text-[13px] text-gray-500 mt-1.5">Vue d'ensemble du moteur IA juridique souverain</p>
         </div>
-        {ollama && (
-          <div className={cn(
-            "flex items-center gap-2 px-3 py-1.5 rounded-full text-[12px] font-medium border",
-            ollama.available
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border-amber-200 bg-amber-50 text-amber-700",
-          )}>
-            {ollama.available
-              ? <Zap className="w-3.5 h-3.5" />
-              : <AlertTriangle className="w-3.5 h-3.5" />}
-            <span>Ollama — {ollama.available ? ollama.llmModel : "non disponible"}</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <UserMenu />
+
+          {ollama && (
+            <div className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-full text-[12px] font-medium border",
+              ollama.available
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-amber-200 bg-amber-50 text-amber-700",
+            )}>
+              {ollama.available
+                ? <Zap className="w-3.5 h-3.5" />
+                : <AlertTriangle className="w-3.5 h-3.5" />}
+              <span>Ollama — {ollama.available ? ollama.llmModel : "non disponible"}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="px-8 py-6 space-y-6">

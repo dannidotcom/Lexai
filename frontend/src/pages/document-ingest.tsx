@@ -8,7 +8,7 @@ import {
   getListDocumentsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Upload, Loader2, FileJson, CheckCircle2,
   AlertTriangle, ChevronRight, Hash, FileText,
@@ -97,7 +97,7 @@ const JURIS_STATE_LABELS: Record<string, { label: string; color: string }> = {
 // ─── Manual import form ──────────────────────────────────────────────────────
 
 function ManualForm() {
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -114,7 +114,7 @@ function ManualForm() {
       onSuccess: (doc) => {
         queryClient.invalidateQueries({ queryKey: getListDocumentsQueryKey() });
         toast({ title: `Document importé — ${doc.chunkCount} chunks générés` });
-        setLocation("/documents");
+        navigate("/documents");
       },
       onError: () => toast({ title: "Erreur lors de l'import", variant: "destructive" }),
     },
@@ -463,13 +463,13 @@ function LegifranceImport() {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function DocumentIngest() {
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
 
   return (
     <div className="flex-1 overflow-y-auto p-8 max-w-3xl">
       <div className="mb-6">
         <button
-          onClick={() => setLocation("/documents")}
+          onClick={() => navigate("/documents")}
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
         >
           <ArrowLeft className="w-4 h-4" />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation } from "react-router-dom";
 import {
   Scale, MessageSquare, Database, Search, Settings,
   Upload, Menu, X, ChevronRight,
@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 const STORAGE_KEY = "lexia-sidebar-collapsed";
 
 const navigation = [
-  { name: "Dashboard",    href: "/",                 icon: Scale,         section: "main" },
+  { name: "Dashboard",    href: "/dashboard",        icon: Scale,         section: "main" },
   { name: "Chat Engine",  href: "/chat",             icon: MessageSquare, section: "main" },
   { name: "Bibliothèque", href: "/documents",        icon: Database,      section: "main" },
   { name: "Importer",     href: "/documents/ingest", icon: Upload,        section: "main" },
@@ -23,7 +23,7 @@ const mainNav    = navigation.filter(n => n.section === "main");
 const bottomNav  = navigation.filter(n => n.section === "bottom");
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const { pathname } = useLocation();
   const { data: health } = useHealthCheck();
   const isOk = health?.status === "ok";
 
@@ -44,7 +44,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isActive = (href: string) =>
-    href === "/" ? location === "/" : location.startsWith(href);
+    pathname === href || pathname.startsWith(`${href}/`);
 
   const NavItem = ({ item }: { item: typeof navigation[number] }) => {
     const active = isActive(item.href);
@@ -52,7 +52,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
     const inner = (
       <Link
-        href={item.href}
+        to={item.href}
         className={cn(
           "group flex items-center rounded-full transition-all duration-150 select-none outline-none",
           collapsed
