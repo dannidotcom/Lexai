@@ -1,0 +1,48 @@
+{
+  "info": {
+    "name": "LexIA Auth API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api" },
+    { "key": "accessToken", "value": "" },
+    { "key": "resetToken", "value": "" },
+    { "key": "verifyToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Register",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/register",
+        "body": { "mode": "raw", "raw": "{\"email\":\"user@example.com\",\"password\":\"StrongPass123!\",\"confirm_password\":\"StrongPass123!\",\"full_name\":\"User\"}" }
+      }
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/login",
+        "body": { "mode": "raw", "raw": "{\"email\":\"user@example.com\",\"password\":\"StrongPass123!\"}" }
+      }
+    },
+    { "name": "Me", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/auth/me" } },
+    { "name": "Refresh", "request": { "method": "POST", "url": "{{baseUrl}}/auth/refresh" } },
+    { "name": "Logout", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/auth/logout" } },
+    {
+      "name": "Forgot Password",
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/auth/forgot-password", "body": { "mode": "raw", "raw": "{\"email\":\"user@example.com\"}" } }
+    },
+    {
+      "name": "Reset Password",
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/auth/reset-password", "body": { "mode": "raw", "raw": "{\"token\":\"{{resetToken}}\",\"password\":\"NewStrongPass123!\",\"confirm_password\":\"NewStrongPass123!\"}" } }
+    },
+    {
+      "name": "Verify Email",
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/auth/verify-email", "body": { "mode": "raw", "raw": "{\"token\":\"{{verifyToken}}\"}" } }
+    },
+    { "name": "Admin Users", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/admin/users" } }
+  ]
+}

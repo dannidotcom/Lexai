@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
-from app.services.pdf_ingest_service import pdf_ingest_service
+from app.modules.rag_vecor_engine.application import pdf_ingest_service
 
 SOURCES_DIR = Path(__file__).resolve().parents[1] / "sources"
 
