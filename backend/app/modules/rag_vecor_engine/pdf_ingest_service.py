@@ -38,6 +38,7 @@ class PDFIngestService:
         title: str,
         source: str,
         domain: str,
+        source_id: Optional[str] = None,
         document_type: str = "texte",
         metadata: Optional[dict] = None,
     ) -> dict:
@@ -48,6 +49,7 @@ class PDFIngestService:
         data = DocumentInputSchema(
             title=title,
             source=source,
+            sourceId=source_id,
             domain=domain,
             subDomain=None,
             documentType=document_type,

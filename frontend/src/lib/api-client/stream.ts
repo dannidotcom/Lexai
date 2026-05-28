@@ -2,6 +2,12 @@ import { apiUrl } from "./client";
 
 export type AiTaskType = "query" | "explain" | "analyze";
 
+const DEFAULT_FEATURE_BY_TASK: Record<AiTaskType, string> = {
+  query: "ai.query",
+  explain: "ai.explain",
+  analyze: "ai.analyze",
+};
+
 export interface AiStreamCitation {
   documentId: string;
   documentTitle: string;
@@ -19,19 +25,23 @@ export type AiStreamEvent =
 
 export interface AiQueryPayload {
   question: string;
+  featureId?: string;
   domain?: string;
   subDomain?: string;
   sessionId?: string;
   taskType?: AiTaskType;
+  businessContext?: string;
 }
 
 /** Payload attendu par POST /api/ai/analyze/stream */
 export interface AiAnalyzePayload {
   question: string;
   situation: string;
+  featureId?: string;
   domain?: string;
   subDomain?: string;
   sessionId?: string;
+  businessContext?: string;
 }
 
 export function buildAiStreamPayload(
@@ -39,12 +49,14 @@ export function buildAiStreamPayload(
   input: {
     question: string;
     situation?: string;
+    featureId?: string;
     domain?: string;
     sessionId?: string;
   },
 ): AiQueryPayload | AiAnalyzePayload {
   const base = {
     question: input.question,
+    featureId: input.featureId || DEFAULT_FEATURE_BY_TASK[taskType],
     domain: input.domain,
     sessionId: input.sessionId,
   };
@@ -110,6 +122,7 @@ export async function consumeAiStream(
   input: {
     question: string;
     situation?: string;
+    featureId?: string;
     domain?: string;
     sessionId?: string;
   },

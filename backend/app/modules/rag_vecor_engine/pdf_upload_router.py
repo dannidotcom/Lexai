@@ -14,6 +14,7 @@ async def upload_pdf(
     title: str = Form(...),
     source: str = Form(...),
     domain: str = Form(...),
+    sourceId: str | None = Form(default=None),
     documentType: str = Form("texte"),
     db: Session = Depends(get_db),
 ):
@@ -28,6 +29,7 @@ async def upload_pdf(
             title=title,
             source=source,
             domain=domain,
+            source_id=sourceId,
             document_type=documentType,
         )
         return result

@@ -6,19 +6,35 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.db_models import Message, Session as SessionModel
+from app.modules.ai_generation_engine.prompt_service import PromptConfigurationError, prompt_service
 from app.schemas.schemas import AiAnalyzeInputSchema, AiQueryInputSchema, AiResponseSchema, MessageSchema, SessionInputSchema, SessionSchema
 from app.modules.ai_generation_engine.application import ai_service
 
 router = APIRouter(prefix="/ai", tags=["AI Interactions"])
 
 
+def _ensure_feature_prompt(db: Session, feature_id: str) -> None:
+    try:
+        prompt_service.resolve_active_prompt(db, feature_id)
+    except PromptConfigurationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _default_feature_for_task(task_type: str) -> str:
+    return f"ai.{task_type}"
+
+
 @router.post("/query", response_model=AiResponseSchema)
 async def ai_query(data: AiQueryInputSchema, db: Session = Depends(get_db)):
+    data.featureId = data.featureId or _default_feature_for_task("query")
+    _ensure_feature_prompt(db, data.featureId)
     return await ai_service.query(data, db)
 
 
 @router.post("/query/stream")
 async def ai_query_stream(data: AiQueryInputSchema, db: Session = Depends(get_db)):
+    data.featureId = data.featureId or _default_feature_for_task("query")
+    _ensure_feature_prompt(db, data.featureId)
     return StreamingResponse(
         ai_service.query_stream(data, db),
         media_type="text/event-stream",
@@ -30,6 +46,8 @@ async def ai_explain(data: AiQueryInputSchema, db: Session = Depends(get_db)):
     from app.schemas.schemas import TaskType
 
     data.taskType = TaskType.EXPLAIN
+    data.featureId = data.featureId or _default_feature_for_task("explain")
+    _ensure_feature_prompt(db, data.featureId)
     return await ai_service.query(data, db)
 
 
@@ -38,6 +56,8 @@ async def ai_explain_stream(data: AiQueryInputSchema, db: Session = Depends(get_
     from app.schemas.schemas import TaskType
 
     data.taskType = TaskType.EXPLAIN
+    data.featureId = data.featureId or _default_feature_for_task("explain")
+    _ensure_feature_prompt(db, data.featureId)
     return StreamingResponse(
         ai_service.query_stream(data, db),
         media_type="text/event-stream",
@@ -46,11 +66,15 @@ async def ai_explain_stream(data: AiQueryInputSchema, db: Session = Depends(get_
 
 @router.post("/analyze", response_model=AiResponseSchema)
 async def ai_analyze(data: AiAnalyzeInputSchema, db: Session = Depends(get_db)):
+    data.featureId = data.featureId or _default_feature_for_task("analyze")
+    _ensure_feature_prompt(db, data.featureId)
     return await ai_service.analyze(data, db)
 
 
 @router.post("/analyze/stream")
 async def ai_analyze_stream(data: AiAnalyzeInputSchema, db: Session = Depends(get_db)):
+    data.featureId = data.featureId or _default_feature_for_task("analyze")
+    _ensure_feature_prompt(db, data.featureId)
     return StreamingResponse(
         ai_service.analyze_stream(data, db),
         media_type="text/event-stream",

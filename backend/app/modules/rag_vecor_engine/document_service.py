@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import uuid
 from typing import List, Optional
 
 from sqlalchemy.orm import Session as DBSession
 
 from app.core.logging import logger
-from app.models.db_models import Chunk, Document
+from app.models.db_models import AiSource, Chunk, Document, IngestionJob, SourceVersion, now_utc
 from app.schemas.schemas import ChunkSchema, DocumentInputSchema, DocumentSchema
 from app.modules.rag_vecor_engine.chunk_service import build_chunks
 from app.modules.rag_vecor_engine.vector_store import vector_store
@@ -74,86 +75,164 @@ class DocumentService:
     async def ingest_document(self, db: DBSession, data: DocumentInputSchema) -> DocumentSchema:
         content_hash = hashlib.sha256(data.content.encode()).hexdigest()
 
+        source_ref: AiSource | None = None
+        ingestion_job: IngestionJob | None = None
+
+        if data.sourceId:
+            try:
+                source_uuid = uuid.UUID(data.sourceId)
+            except ValueError as exc:
+                raise ValueError("Invalid sourceId format") from exc
+
+            source_ref = db.query(AiSource).filter(AiSource.id == source_uuid).first()
+            if not source_ref:
+                raise ValueError("Unknown sourceId")
+
+            ingestion_job = IngestionJob(source_id=source_ref.id, status="running")
+            db.add(ingestion_job)
+            db.flush()
+
         existing = db.query(Document).filter(Document.content_hash == content_hash).first()
         if existing:
             logger.info("Document already exists (same hash)", doc_id=existing.id)
-            return _doc_to_schema(existing)
 
-        doc = Document(
-            title=data.title,
-            source=data.source,
-            domain=data.domain,
-            sub_domain=data.subDomain,
-            document_type=data.documentType,
-            status="indexing",
-            url=data.url,
-            version=data.version,
-            content_hash=content_hash,
-            metadata_=data.metadata or {},
-        )
-        db.add(doc)
-        db.flush()
-
-        raw_chunks = build_chunks(
-            content=data.content,
-            document_id=doc.id,
-            domain=data.domain,
-            source=data.source,
-            document_title=data.title,
-            metadata=data.metadata or {},
-        )
-
-        chunk_objects = []
-        for c in raw_chunks:
-            chunk = Chunk(
-                document_id=doc.id,
-                content=c["content"],
-                section_path=c["section_path"],
-                article_id=c.get("article_id"),
-                statut_juridique=c["statut_juridique"],
-                chunk_index=c["chunk_index"],
-                embedding_generated=False,
-            )
-            db.add(chunk)
-            chunk_objects.append((chunk, c))
-        db.flush()
-
-        embedded_count = 0
-        for chunk, _ in chunk_objects:
-            embedding = await ollama_service.generate_embedding(chunk.content)
-            if embedding:
-                try:
-                    qdrant_id = vector_store.upsert_chunk(
-                        chunk_id=chunk.id,
-                        embedding=embedding,
-                        payload={
-                            "chunk_id": chunk.id,
-                            "document_id": doc.id,
-                            "domain": data.domain,
+            if source_ref and ingestion_job:
+                db.add(
+                    SourceVersion(
+                        source_id=source_ref.id,
+                        version_hash=content_hash,
+                        status="duplicate",
+                        content_uri=data.url,
+                        raw_text=data.content,
+                        meta={
+                            "document_id": existing.id,
                             "source": data.source,
-                            "document_title": data.title,
-                            "section_path": chunk.section_path,
-                            "article_id": chunk.article_id,
-                            "statut_juridique": chunk.statut_juridique,
+                            "domain": data.domain,
                         },
                     )
-                    chunk.qdrant_id = qdrant_id
-                    chunk.embedding_generated = True
-                    embedded_count += 1
-                except Exception as exc:
-                    logger.warning("Failed to store embedding in Qdrant", error=str(exc))
+                )
+                self._mark_source_success(source_ref)
+                ingestion_job.status = "completed"
+                ingestion_job.ended_at = now_utc()
+                db.commit()
 
-        doc.status = "indexed"
-        db.commit()
-        db.refresh(doc)
+            return _doc_to_schema(existing)
 
-        logger.info(
-            "Document ingested",
-            doc_id=doc.id,
-            chunks=len(chunk_objects),
-            embedded=embedded_count,
-        )
-        return _doc_to_schema(doc)
+        try:
+            doc = Document(
+                title=data.title,
+                source=data.source,
+                domain=data.domain,
+                sub_domain=data.subDomain,
+                document_type=data.documentType,
+                status="indexing",
+                url=data.url,
+                version=data.version,
+                content_hash=content_hash,
+                metadata_=data.metadata or {},
+            )
+            db.add(doc)
+            db.flush()
+
+            raw_chunks = build_chunks(
+                content=data.content,
+                document_id=doc.id,
+                domain=data.domain,
+                source=data.source,
+                document_title=data.title,
+                metadata=data.metadata or {},
+            )
+
+            chunk_objects = []
+            for c in raw_chunks:
+                chunk = Chunk(
+                    document_id=doc.id,
+                    content=c["content"],
+                    section_path=c["section_path"],
+                    article_id=c.get("article_id"),
+                    statut_juridique=c["statut_juridique"],
+                    chunk_index=c["chunk_index"],
+                    embedding_generated=False,
+                )
+                db.add(chunk)
+                chunk_objects.append((chunk, c))
+            db.flush()
+
+            embedded_count = 0
+            for chunk, _ in chunk_objects:
+                embedding = await ollama_service.generate_embedding(chunk.content)
+                if embedding:
+                    try:
+                        qdrant_id = vector_store.upsert_chunk(
+                            chunk_id=chunk.id,
+                            embedding=embedding,
+                            payload={
+                                "chunk_id": chunk.id,
+                                "document_id": doc.id,
+                                "domain": data.domain,
+                                "source": data.source,
+                                "document_title": data.title,
+                                "section_path": chunk.section_path,
+                                "article_id": chunk.article_id,
+                                "statut_juridique": chunk.statut_juridique,
+                            },
+                        )
+                        chunk.qdrant_id = qdrant_id
+                        chunk.embedding_generated = True
+                        embedded_count += 1
+                    except Exception as exc:
+                        logger.warning("Failed to store embedding in Qdrant", error=str(exc))
+
+            doc.status = "indexed"
+
+            if source_ref and ingestion_job:
+                db.add(
+                    SourceVersion(
+                        source_id=source_ref.id,
+                        version_hash=content_hash,
+                        status="valid",
+                        content_uri=data.url,
+                        raw_text=data.content,
+                        meta={
+                            "document_id": doc.id,
+                            "source": data.source,
+                            "domain": data.domain,
+                        },
+                    )
+                )
+                self._mark_source_success(source_ref)
+                ingestion_job.status = "completed"
+                ingestion_job.ended_at = now_utc()
+
+            db.commit()
+            db.refresh(doc)
+
+            logger.info(
+                "Document ingested",
+                doc_id=doc.id,
+                chunks=len(chunk_objects),
+                embedded=embedded_count,
+            )
+            return _doc_to_schema(doc)
+        except Exception as exc:
+            db.rollback()
+
+            if source_ref or ingestion_job:
+                try:
+                    if source_ref:
+                        self._mark_source_failure(source_ref, str(exc))
+                        db.add(source_ref)
+                    if ingestion_job:
+                        ingestion_job.status = "failed"
+                        ingestion_job.ended_at = now_utc()
+                        ingestion_job.error_message = str(exc)[:2000]
+                        ingestion_job.retry_count = (ingestion_job.retry_count or 0) + 1
+                        db.add(ingestion_job)
+                    db.commit()
+                except Exception:
+                    db.rollback()
+
+            raise
 
     def delete_document(self, db: DBSession, doc_id: str) -> bool:
         doc = db.query(Document).filter(Document.id == doc_id).first()
@@ -170,6 +249,18 @@ class DocumentService:
         db.delete(doc)
         db.commit()
         return True
+
+    def _mark_source_success(self, source: AiSource) -> None:
+        source.last_update_at = now_utc()
+        source.last_update_status = "success"
+        source.last_error_message = None
+        source.consecutive_failures = 0
+
+    def _mark_source_failure(self, source: AiSource, message: str) -> None:
+        source.last_update_at = now_utc()
+        source.last_update_status = "failed"
+        source.last_error_message = message[:2000]
+        source.consecutive_failures = (source.consecutive_failures or 0) + 1
 
 
 document_service = DocumentService()

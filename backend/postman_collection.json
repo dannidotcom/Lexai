@@ -1,48 +1,303 @@
 {
   "info": {
-    "name": "LexIA Auth API",
+    "name": "LexIA API - Auth + Prompt CRUD",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:8080/api" },
     { "key": "accessToken", "value": "" },
     { "key": "resetToken", "value": "" },
-    { "key": "verifyToken", "value": "" }
+    { "key": "verifyToken", "value": "" },
+    { "key": "featureId", "value": "ai.query" },
+    { "key": "promptBaseId", "value": "" },
+    { "key": "promptTemplateId", "value": "" },
+    { "key": "promptVersionId", "value": "" }
   ],
   "item": [
     {
-      "name": "Register",
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "url": "{{baseUrl}}/auth/register",
-        "body": { "mode": "raw", "raw": "{\"email\":\"user@example.com\",\"password\":\"StrongPass123!\",\"confirm_password\":\"StrongPass123!\",\"full_name\":\"User\"}" }
-      }
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin.prompt@example.com\",\n  \"password\": \"StrongPass123!\",\n  \"confirm_password\": \"StrongPass123!\",\n  \"full_name\": \"Prompt Admin\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.access_token) {",
+                  "    pm.collectionVariables.set('accessToken', json.access_token);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin.prompt@example.com\",\n  \"password\": \"StrongPass123!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/auth/me"
+          }
+        },
+        {
+          "name": "Admin Users",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/admin/users"
+          }
+        }
+      ]
     },
     {
-      "name": "Login",
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "url": "{{baseUrl}}/auth/login",
-        "body": { "mode": "raw", "raw": "{\"email\":\"user@example.com\",\"password\":\"StrongPass123!\"}" }
-      }
-    },
-    { "name": "Me", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/auth/me" } },
-    { "name": "Refresh", "request": { "method": "POST", "url": "{{baseUrl}}/auth/refresh" } },
-    { "name": "Logout", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/auth/logout" } },
-    {
-      "name": "Forgot Password",
-      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/auth/forgot-password", "body": { "mode": "raw", "raw": "{\"email\":\"user@example.com\"}" } }
-    },
-    {
-      "name": "Reset Password",
-      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/auth/reset-password", "body": { "mode": "raw", "raw": "{\"token\":\"{{resetToken}}\",\"password\":\"NewStrongPass123!\",\"confirm_password\":\"NewStrongPass123!\"}" } }
-    },
-    {
-      "name": "Verify Email",
-      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{baseUrl}}/auth/verify-email", "body": { "mode": "raw", "raw": "{\"token\":\"{{verifyToken}}\"}" } }
-    },
-    { "name": "Admin Users", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/admin/users" } }
+      "name": "Prompt CRUD",
+      "item": [
+        {
+          "name": "Prompt Bases",
+          "item": [
+            {
+              "name": "List Prompt Bases",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+                "url": "{{baseUrl}}/ai/prompts/bases"
+              }
+            },
+            {
+              "name": "Create Prompt Base",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "  const json = pm.response.json();",
+                      "  pm.collectionVariables.set('promptBaseId', json.id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "url": "{{baseUrl}}/ai/prompts/bases",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"content\": \"Base prompt policy for LexIA prompt CRUD tests.\",\n  \"status\": \"active\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get Prompt Base",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+                "url": "{{baseUrl}}/ai/prompts/bases/{{promptBaseId}}"
+              }
+            },
+            {
+              "name": "Update Prompt Base",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "url": "{{baseUrl}}/ai/prompts/bases/{{promptBaseId}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"content\": \"Updated base prompt policy content from Postman.\",\n  \"status\": \"active\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Delete Prompt Base",
+              "request": {
+                "method": "DELETE",
+                "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+                "url": "{{baseUrl}}/ai/prompts/bases/{{promptBaseId}}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Prompt Templates",
+          "item": [
+            {
+              "name": "List Prompt Templates",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+                "url": "{{baseUrl}}/ai/prompts/templates?feature_id={{featureId}}"
+              }
+            },
+            {
+              "name": "Create Prompt Template",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "  const json = pm.response.json();",
+                      "  pm.collectionVariables.set('promptTemplateId', json.id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "url": "{{baseUrl}}/ai/prompts/templates",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"feature_id\": \"{{featureId}}\",\n  \"name\": \"Prompt Template CRUD Demo\",\n  \"domain\": \"juridique\",\n  \"sub_domain\": \"social\",\n  \"task_type\": \"query\",\n  \"expected_format\": \"1) Reponse 2) Analyse 3) Sources\",\n  \"business_rules\": \"Ne jamais inventer une information non presente dans le contexte.\",\n  \"template_content\": \"CONTEXTE:\\n{{context}}\\n\\nQUESTION:\\n{{question}}\\n\\nDOMAINE: {{domain}}\\nSOUS_DOMAINE: {{sub_domain}}\\nCONTEXTE_METIER: {{business_context}}\",\n  \"status\": \"active\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get Prompt Template",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+                "url": "{{baseUrl}}/ai/prompts/templates/{{promptTemplateId}}"
+              }
+            },
+            {
+              "name": "Update Prompt Template",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "url": "{{baseUrl}}/ai/prompts/templates/{{promptTemplateId}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Prompt Template CRUD Demo Updated\",\n  \"expected_format\": \"1) Resume 2) Analyse detaillee 3) Sources\",\n  \"status\": \"active\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Delete Prompt Template",
+              "request": {
+                "method": "DELETE",
+                "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+                "url": "{{baseUrl}}/ai/prompts/templates/{{promptTemplateId}}"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Prompt Versions",
+          "item": [
+            {
+              "name": "List Prompt Versions",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+                "url": "{{baseUrl}}/ai/prompts/versions?feature_id={{featureId}}"
+              }
+            },
+            {
+              "name": "Create Prompt Version",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "  const json = pm.response.json();",
+                      "  pm.collectionVariables.set('promptVersionId', json.id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "url": "{{baseUrl}}/ai/prompts/versions",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"feature_id\": \"{{featureId}}\",\n  \"prompt_base_id\": \"{{promptBaseId}}\",\n  \"template_id\": \"{{promptTemplateId}}\",\n  \"system_prompt\": \"System guardrails for CRUD test version.\",\n  \"user_prompt_template\": \"SYNTHETISE:\\n- Question: {{question}}\\n- Contexte: {{context}}\",\n  \"status\": \"active\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get Prompt Version",
+              "request": {
+                "method": "GET",
+                "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+                "url": "{{baseUrl}}/ai/prompts/versions/{{promptVersionId}}"
+              }
+            },
+            {
+              "name": "Update Prompt Version",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "url": "{{baseUrl}}/ai/prompts/versions/{{promptVersionId}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"system_prompt\": \"Updated system prompt guardrails from Postman.\",\n  \"user_prompt_template\": \"QUESTION:\\n{{question}}\\n\\nCONTEXTE:\\n{{context}}\\n\\nREPONDRE EN 3 ETAPES.\",\n  \"status\": \"active\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Delete Prompt Version",
+              "request": {
+                "method": "DELETE",
+                "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+                "url": "{{baseUrl}}/ai/prompts/versions/{{promptVersionId}}"
+              }
+            }
+          ]
+        }
+      ]
+    }
   ]
 }

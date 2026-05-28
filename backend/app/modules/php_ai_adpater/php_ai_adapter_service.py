@@ -19,6 +19,7 @@ class PhpAiQueryInput(BaseModel):
 
     domaine: Optional[str] = Field(default=None, alias="domain")
     sous_domaine: Optional[str] = Field(default=None, alias="subDomain")
+    feature_id: Optional[str] = Field(default=None, alias="featureId")
     question: str
     contexte_metier: Optional[str] = Field(default=None, alias="businessContext")
     type_tache: TaskType = Field(default=TaskType.QUERY, alias="taskType")
@@ -51,7 +52,8 @@ class PhpAiAnalyzeInput(BaseModel):
 
     domaine: Optional[str] = Field(default=None, alias="domain")
     sous_domaine: Optional[str] = Field(default=None, alias="subDomain")
-    question: str = "Analyse le document ou le texte fourni."
+    feature_id: Optional[str] = Field(default=None, alias="featureId")
+    question: str
     document: Optional[str] = None
     texte: Optional[str] = Field(default=None, alias="text")
     contexte_metier: Optional[str] = Field(default=None, alias="businessContext")
@@ -105,9 +107,11 @@ class PhpAiAdapterService:
         db = SessionLocal()
         try:
             ai_input = AiQueryInputSchema(
-                question=self._question_with_business_context(data.question, data.contexte_metier),
+                question=data.question,
+                featureId=data.feature_id,
                 domain=data.domaine,
                 subDomain=data.sous_domaine,
+                businessContext=data.contexte_metier,
                 sessionId=data.session_id,
                 taskType=data.type_tache,
                 limitSources=data.limite_sources,
@@ -133,14 +137,13 @@ class PhpAiAdapterService:
             if not situation:
                 raise ValueError("Le champ 'document' ou 'texte' est obligatoire pour l'analyse.")
 
-            if data.contexte_metier:
-                situation = f"Contexte metier:\n{data.contexte_metier}\n\nDocument ou texte:\n{situation}"
-
             ai_input = AiAnalyzeInputSchema(
                 question=data.question,
                 situation=situation,
+                featureId=data.feature_id,
                 domain=data.domaine,
                 subDomain=data.sous_domaine,
+                businessContext=data.contexte_metier,
                 sessionId=data.session_id,
                 limitSources=data.limite_sources,
             )
@@ -206,11 +209,6 @@ class PhpAiAdapterService:
 
     def _response_from_state(self, state: Dict[str, Any]) -> AdapterResponse:
         return AdapterResponse(**state)
-
-    def _question_with_business_context(self, question: str, business_context: Optional[str]) -> str:
-        if not business_context:
-            return question
-        return f"Contexte metier:\n{business_context}\n\nQuestion:\n{question}"
 
     def _standardize_ai_response(self, response: AiResponseSchema) -> Dict[str, Any]:
         return {

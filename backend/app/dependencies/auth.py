@@ -20,6 +20,10 @@ ROLE_PERMISSIONS: dict[UserRole, set[str]] = {
         "admin:users:create",
         "admin:users:update",
         "admin:users:delete",
+        "admin:prompts:read",
+        "admin:prompts:create",
+        "admin:prompts:update",
+        "admin:prompts:delete",
     },
     UserRole.CUSTOM: set(),
 }

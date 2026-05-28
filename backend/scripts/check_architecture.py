@@ -24,6 +24,7 @@ ALLOWED_IMPORTS_BY_LAYER: dict[str, tuple[str, ...]] = {
         "app.middleware",
         "app.models",
         "app.modules",
+        "app.schemas",
         "app.shared",
     ),
     "modules.auth_engine": (
@@ -38,6 +39,7 @@ ALLOWED_IMPORTS_BY_LAYER: dict[str, tuple[str, ...]] = {
         "app.core",
         "app.models",
         "app.modules.rag_vecor_engine",
+        "app.schemas",
         "app.shared",
     ),
     "modules.rag_search_engine": (
@@ -45,13 +47,16 @@ ALLOWED_IMPORTS_BY_LAYER: dict[str, tuple[str, ...]] = {
         "app.models",
         "app.modules.rag_vecor_engine",
         "app.modules.rag_search_engine",
+        "app.schemas",
         "app.shared",
     ),
     "modules.ai_generation_engine": (
         "app.core",
+        "app.dependencies",
         "app.models",
         "app.modules.ai_generation_engine",
         "app.modules.rag_search_engine",
+        "app.schemas",
         "app.shared",
     ),
     "modules.php_ai_adpater": (
@@ -59,6 +64,7 @@ ALLOWED_IMPORTS_BY_LAYER: dict[str, tuple[str, ...]] = {
         "app.models",
         "app.modules.ai_generation_engine",
         "app.modules.php_ai_adpater",
+        "app.schemas",
         "app.shared",
     ),
     "modules.rag_vector_engine": (

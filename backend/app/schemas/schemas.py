@@ -1,4 +1,5 @@
 from __future__ import annotations
+import uuid
 from datetime import datetime
 from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field
@@ -76,6 +77,7 @@ class DocumentSchema(BaseModel):
 class DocumentInputSchema(BaseModel):
     title: str
     source: str
+    sourceId: Optional[str] = None
     domain: str
     subDomain: Optional[str] = None
     documentType: str
@@ -120,8 +122,10 @@ class ContextResultSchema(BaseModel):
 
 class AiQueryInputSchema(BaseModel):
     question: str
+    featureId: Optional[str] = Field(default=None, min_length=3, max_length=120)
     domain: Optional[str] = None
     subDomain: Optional[str] = None
+    businessContext: Optional[str] = None
     sessionId: Optional[str] = None
     taskType: TaskType = TaskType.QUERY
     limitSources: Optional[int] = Field(default=None, ge=1, le=20)
@@ -130,8 +134,10 @@ class AiQueryInputSchema(BaseModel):
 class AiAnalyzeInputSchema(BaseModel):
     question: str
     situation: str
+    featureId: Optional[str] = Field(default=None, min_length=3, max_length=120)
     domain: Optional[str] = None
     subDomain: Optional[str] = None
+    businessContext: Optional[str] = None
     sessionId: Optional[str] = None
     limitSources: Optional[int] = Field(default=None, ge=1, le=20)
 
@@ -156,6 +162,103 @@ class AiResponseSchema(BaseModel):
     sessionId: Optional[str] = None
     hasContext: bool
     modelUsed: str
+
+
+class PromptBaseReadSchema(BaseModel):
+    id: uuid.UUID
+    content: str
+    version: int
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PromptBaseCreateSchema(BaseModel):
+    content: str = Field(min_length=1)
+    version: Optional[int] = Field(default=None, ge=1)
+    status: str = Field(default="active", min_length=1, max_length=40)
+
+
+class PromptBaseUpdateSchema(BaseModel):
+    content: Optional[str] = Field(default=None, min_length=1)
+    status: Optional[str] = Field(default=None, min_length=1, max_length=40)
+
+
+class PromptTemplateReadSchema(BaseModel):
+    id: uuid.UUID
+    feature_id: str
+    name: str
+    domain: str
+    sub_domain: Optional[str] = None
+    task_type: str
+    expected_format: str
+    business_rules: Optional[str] = None
+    template_content: str
+    version: int
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PromptTemplateCreateSchema(BaseModel):
+    feature_id: str = Field(min_length=3, max_length=120)
+    name: str = Field(min_length=1, max_length=255)
+    domain: str = Field(min_length=1, max_length=80)
+    sub_domain: Optional[str] = Field(default=None, max_length=120)
+    task_type: str = Field(min_length=1, max_length=80)
+    expected_format: str = Field(min_length=1)
+    business_rules: Optional[str] = None
+    template_content: str = Field(min_length=1)
+    version: Optional[int] = Field(default=None, ge=1)
+    status: str = Field(default="active", min_length=1, max_length=40)
+
+
+class PromptTemplateUpdateSchema(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    domain: Optional[str] = Field(default=None, min_length=1, max_length=80)
+    sub_domain: Optional[str] = Field(default=None, max_length=120)
+    task_type: Optional[str] = Field(default=None, min_length=1, max_length=80)
+    expected_format: Optional[str] = Field(default=None, min_length=1)
+    business_rules: Optional[str] = None
+    template_content: Optional[str] = Field(default=None, min_length=1)
+    status: Optional[str] = Field(default=None, min_length=1, max_length=40)
+
+
+class PromptVersionReadSchema(BaseModel):
+    id: uuid.UUID
+    feature_id: str
+    prompt_base_id: uuid.UUID
+    template_id: uuid.UUID
+    system_prompt: str
+    user_prompt_template: str
+    version: int
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PromptVersionCreateSchema(BaseModel):
+    feature_id: str = Field(min_length=3, max_length=120)
+    prompt_base_id: uuid.UUID
+    template_id: uuid.UUID
+    system_prompt: str = Field(min_length=1)
+    user_prompt_template: str = Field(min_length=1)
+    version: Optional[int] = Field(default=None, ge=1)
+    status: str = Field(default="active", min_length=1, max_length=40)
+
+
+class PromptVersionUpdateSchema(BaseModel):
+    prompt_base_id: Optional[uuid.UUID] = None
+    template_id: Optional[uuid.UUID] = None
+    system_prompt: Optional[str] = Field(default=None, min_length=1)
+    user_prompt_template: Optional[str] = Field(default=None, min_length=1)
+    status: Optional[str] = Field(default=None, min_length=1, max_length=40)
 
 
 class SessionSchema(BaseModel):
