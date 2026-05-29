@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 from typing import Optional, Protocol
 
-from sqlalchemy.orm import Session as DBSession
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.schemas import (
     AiAnalyzeInputSchema,
@@ -16,18 +16,18 @@ from app.schemas.schemas import (
 
 
 class AIGenerationPort(Protocol):
-    async def query(self, input_data: AiQueryInputSchema, db: DBSession) -> AiResponseSchema:
+    async def query(self, input_data: AiQueryInputSchema, db: AsyncSession) -> AiResponseSchema:
         ...
 
-    async def analyze(self, input_data: AiAnalyzeInputSchema, db: DBSession) -> AiResponseSchema:
+    async def analyze(self, input_data: AiAnalyzeInputSchema, db: AsyncSession) -> AiResponseSchema:
         ...
 
 
 class AIGenerationStreamingPort(Protocol):
-    async def query_stream(self, input_data: AiQueryInputSchema, db: DBSession) -> AsyncIterator[str]:
+    async def query_stream(self, input_data: AiQueryInputSchema, db: AsyncSession) -> AsyncIterator[str]:
         ...
 
-    async def analyze_stream(self, input_data: AiAnalyzeInputSchema, db: DBSession) -> AsyncIterator[str]:
+    async def analyze_stream(self, input_data: AiAnalyzeInputSchema, db: AsyncSession) -> AsyncIterator[str]:
         ...
 
 

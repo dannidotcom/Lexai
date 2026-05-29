@@ -8,8 +8,8 @@ from typing import Any, Dict, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.config import settings
-from app.core.database import SessionLocal
 from app.core.logging import logger
+from app.core.session import AsyncSessionLocal
 from app.schemas.schemas import AiAnalyzeInputSchema, AiQueryInputSchema, AiResponseSchema, TaskType
 from app.modules.ai_generation_engine.application import ai_service
 
@@ -104,61 +104,57 @@ class PhpAiAdapterService:
 
     async def _run_query(self, request_id: str, data: PhpAiQueryInput) -> None:
         await self._update_request(request_id, status="running", progression=20)
-        db = SessionLocal()
-        try:
-            ai_input = AiQueryInputSchema(
-                question=data.question,
-                featureId=data.feature_id,
-                domain=data.domaine,
-                subDomain=data.sous_domaine,
-                businessContext=data.contexte_metier,
-                sessionId=data.session_id,
-                taskType=data.type_tache,
-                limitSources=data.limite_sources,
-            )
-            result = await asyncio.wait_for(
-                ai_service.query(ai_input, db),
-                timeout=settings.ai_timeout_seconds,
-            )
-            await self._complete_request(request_id, result)
-        except asyncio.TimeoutError:
-            await self._fail_request(request_id, "timeout", "Le moteur IA n'a pas repondu dans le delai imparti.")
-        except Exception as exc:
-            logger.error("PHP AI adapter query failed", request_id=request_id, error=str(exc))
-            await self._fail_request(request_id, "ai_error", str(exc))
-        finally:
-            db.close()
+        async with AsyncSessionLocal() as db:
+            try:
+                ai_input = AiQueryInputSchema(
+                    question=data.question,
+                    featureId=data.feature_id,
+                    domain=data.domaine,
+                    subDomain=data.sous_domaine,
+                    businessContext=data.contexte_metier,
+                    sessionId=data.session_id,
+                    taskType=data.type_tache,
+                    limitSources=data.limite_sources,
+                )
+                result = await asyncio.wait_for(
+                    ai_service.query(ai_input, db),
+                    timeout=settings.ai_timeout_seconds,
+                )
+                await self._complete_request(request_id, result)
+            except asyncio.TimeoutError:
+                await self._fail_request(request_id, "timeout", "Le moteur IA n'a pas repondu dans le delai imparti.")
+            except Exception as exc:
+                logger.error("PHP AI adapter query failed", request_id=request_id, error=str(exc))
+                await self._fail_request(request_id, "ai_error", str(exc))
 
     async def _run_analyze(self, request_id: str, data: PhpAiAnalyzeInput) -> None:
         await self._update_request(request_id, status="running", progression=20)
-        db = SessionLocal()
-        try:
-            situation = data.document or data.texte
-            if not situation:
-                raise ValueError("Le champ 'document' ou 'texte' est obligatoire pour l'analyse.")
+        async with AsyncSessionLocal() as db:
+            try:
+                situation = data.document or data.texte
+                if not situation:
+                    raise ValueError("Le champ 'document' ou 'texte' est obligatoire pour l'analyse.")
 
-            ai_input = AiAnalyzeInputSchema(
-                question=data.question,
-                situation=situation,
-                featureId=data.feature_id,
-                domain=data.domaine,
-                subDomain=data.sous_domaine,
-                businessContext=data.contexte_metier,
-                sessionId=data.session_id,
-                limitSources=data.limite_sources,
-            )
-            result = await asyncio.wait_for(
-                ai_service.analyze(ai_input, db),
-                timeout=settings.ai_timeout_seconds,
-            )
-            await self._complete_request(request_id, result)
-        except asyncio.TimeoutError:
-            await self._fail_request(request_id, "timeout", "Le moteur IA n'a pas repondu dans le delai imparti.")
-        except Exception as exc:
-            logger.error("PHP AI adapter analyze failed", request_id=request_id, error=str(exc))
-            await self._fail_request(request_id, "ai_error", str(exc))
-        finally:
-            db.close()
+                ai_input = AiAnalyzeInputSchema(
+                    question=data.question,
+                    situation=situation,
+                    featureId=data.feature_id,
+                    domain=data.domaine,
+                    subDomain=data.sous_domaine,
+                    businessContext=data.contexte_metier,
+                    sessionId=data.session_id,
+                    limitSources=data.limite_sources,
+                )
+                result = await asyncio.wait_for(
+                    ai_service.analyze(ai_input, db),
+                    timeout=settings.ai_timeout_seconds,
+                )
+                await self._complete_request(request_id, result)
+            except asyncio.TimeoutError:
+                await self._fail_request(request_id, "timeout", "Le moteur IA n'a pas repondu dans le delai imparti.")
+            except Exception as exc:
+                logger.error("PHP AI adapter analyze failed", request_id=request_id, error=str(exc))
+                await self._fail_request(request_id, "ai_error", str(exc))
 
     async def _create_request(self, operation: str) -> str:
         request_id = str(uuid.uuid4())

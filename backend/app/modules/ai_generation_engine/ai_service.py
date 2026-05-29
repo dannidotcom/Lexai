@@ -4,7 +4,8 @@ import hashlib
 from datetime import datetime, timezone
 from typing import Iterable, List
 
-from sqlalchemy.orm import Session as DBSession
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.logging import logger
@@ -21,8 +22,8 @@ class AIService:
             return feature_id.strip()
         return f"ai.{task_type}"
 
-    def _resolve_prompt_configuration(self, db: DBSession, feature_id: str) -> ResolvedPromptConfiguration:
-        return prompt_service.resolve_active_prompt(db, feature_id)
+    async def _resolve_prompt_configuration(self, db: AsyncSession, feature_id: str) -> ResolvedPromptConfiguration:
+        return await prompt_service.resolve_active_prompt(db, feature_id)
 
     def _build_prompt_values(
         self,
@@ -96,10 +97,10 @@ class AIService:
         digest = hashlib.sha256("|".join(signatures).encode("utf-8")).hexdigest()
         return digest
 
-    def _log_request(
+    async def _log_request(
         self,
         *,
-        db: DBSession,
+        db: AsyncSession,
         feature_id: str,
         domain: str,
         sub_domain: str | None,
@@ -123,19 +124,19 @@ class AIService:
                     knowledge_version=self._build_knowledge_version(sources_used),
                 )
             )
-            db.commit()
+            await db.commit()
         except Exception as exc:
             logger.error("Failed to log AI request", feature_id=feature_id, error=str(exc))
-            db.rollback()
+            await db.rollback()
 
     async def query(
         self,
         input_data: AiQueryInputSchema,
-        db: DBSession,
+        db: AsyncSession,
     ) -> AiResponseSchema:
         task_type = input_data.taskType.value if hasattr(input_data.taskType, "value") else str(input_data.taskType)
         feature_id = self._resolve_feature_id(input_data.featureId, task_type)
-        prompt_config = self._resolve_prompt_configuration(db, feature_id)
+        prompt_config = await self._resolve_prompt_configuration(db, feature_id)
 
         context_result = await rag_service.get_context(
             query=input_data.question,
@@ -199,7 +200,7 @@ class AIService:
                 response=response,
             )
 
-        self._log_request(
+        await self._log_request(
             db=db,
             feature_id=feature_id,
             domain=response_domain,
@@ -216,13 +217,13 @@ class AIService:
     async def query_stream(
         self,
         input_data: AiQueryInputSchema,
-        db: DBSession,
+        db: AsyncSession,
     ):
         import json
 
         task_type = input_data.taskType.value if hasattr(input_data.taskType, "value") else str(input_data.taskType)
         feature_id = self._resolve_feature_id(input_data.featureId, task_type)
-        prompt_config = self._resolve_prompt_configuration(db, feature_id)
+        prompt_config = await self._resolve_prompt_configuration(db, feature_id)
 
         context_result = await rag_service.get_context(
             query=input_data.question,
@@ -292,7 +293,7 @@ class AIService:
                 response=response,
             )
 
-        self._log_request(
+        await self._log_request(
             db=db,
             feature_id=feature_id,
             domain=response_domain,
@@ -309,10 +310,10 @@ class AIService:
     async def analyze(
         self,
         input_data: AiAnalyzeInputSchema,
-        db: DBSession,
+        db: AsyncSession,
     ) -> AiResponseSchema:
         feature_id = self._resolve_feature_id(input_data.featureId, "analyze")
-        prompt_config = self._resolve_prompt_configuration(db, feature_id)
+        prompt_config = await self._resolve_prompt_configuration(db, feature_id)
 
         query_text = f"{input_data.question}\n{input_data.situation}"
 
@@ -383,7 +384,7 @@ class AIService:
                 response=response,
             )
 
-        self._log_request(
+        await self._log_request(
             db=db,
             feature_id=feature_id,
             domain=response_domain,
@@ -400,12 +401,12 @@ class AIService:
     async def analyze_stream(
         self,
         input_data: AiAnalyzeInputSchema,
-        db: DBSession,
+        db: AsyncSession,
     ):
         import json
 
         feature_id = self._resolve_feature_id(input_data.featureId, "analyze")
-        prompt_config = self._resolve_prompt_configuration(db, feature_id)
+        prompt_config = await self._resolve_prompt_configuration(db, feature_id)
 
         query_text = f"{input_data.question}\n{input_data.situation}"
 
@@ -483,7 +484,7 @@ class AIService:
                 response=response,
             )
 
-        self._log_request(
+        await self._log_request(
             db=db,
             feature_id=feature_id,
             domain=response_domain,
@@ -499,13 +500,13 @@ class AIService:
 
     async def _save_exchange(
         self,
-        db: DBSession,
+        db: AsyncSession,
         session_id: str,
         question: str,
         response: AiResponseSchema,
     ) -> None:
         try:
-            session = db.query(Session).filter(Session.id == session_id).first()
+            session = await db.scalar(select(Session).where(Session.id == session_id))
             if not session:
                 return
 
@@ -529,10 +530,10 @@ class AIService:
                 )
             )
 
-            db.commit()
+            await db.commit()
         except Exception as exc:
             logger.error("Save exchange failed", error=str(exc))
-            db.rollback()
+            await db.rollback()
 
 
 ai_service = AIService()

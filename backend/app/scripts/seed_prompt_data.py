@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import SessionLocal, init_db
+from app.core.database import init_db
+from app.core.session import AsyncSessionLocal
 from app.models.db_models import AiFeatureRegistry, PromptBase, PromptTemplate, PromptVersion
 
 
@@ -149,8 +152,8 @@ Structure la reponse:
 ]
 
 
-def _upsert_prompt_base(db: Session) -> PromptBase:
-    prompt_base = db.query(PromptBase).filter(PromptBase.version == BASE_PROMPT_VERSION).first()
+async def _upsert_prompt_base(db: AsyncSession) -> PromptBase:
+    prompt_base = await db.scalar(select(PromptBase).where(PromptBase.version == BASE_PROMPT_VERSION))
     if not prompt_base:
         prompt_base = PromptBase(
             content=BASE_PROMPT_CONTENT,
@@ -162,18 +165,16 @@ def _upsert_prompt_base(db: Session) -> PromptBase:
         prompt_base.content = BASE_PROMPT_CONTENT
         prompt_base.status = "active"
 
-    db.flush()
+    await db.flush()
     return prompt_base
 
 
-def _upsert_prompt_template(db: Session, feature: FeatureSeed) -> PromptTemplate:
-    template = (
-        db.query(PromptTemplate)
-        .filter(
+async def _upsert_prompt_template(db: AsyncSession, feature: FeatureSeed) -> PromptTemplate:
+    template = await db.scalar(
+        select(PromptTemplate).where(
             PromptTemplate.feature_id == feature.feature_id,
             PromptTemplate.version == feature.template_version,
         )
-        .first()
     )
 
     if not template:
@@ -200,12 +201,12 @@ def _upsert_prompt_template(db: Session, feature: FeatureSeed) -> PromptTemplate
         template.template_content = feature.template_content
         template.status = "active"
 
-    db.flush()
+    await db.flush()
     return template
 
 
-def _upsert_feature_registry(db: Session, feature: FeatureSeed, template: PromptTemplate) -> AiFeatureRegistry:
-    registry = db.query(AiFeatureRegistry).filter(AiFeatureRegistry.feature_id == feature.feature_id).first()
+async def _upsert_feature_registry(db: AsyncSession, feature: FeatureSeed, template: PromptTemplate) -> AiFeatureRegistry:
+    registry = await db.scalar(select(AiFeatureRegistry).where(AiFeatureRegistry.feature_id == feature.feature_id))
 
     if not registry:
         registry = AiFeatureRegistry(
@@ -232,18 +233,16 @@ def _upsert_feature_registry(db: Session, feature: FeatureSeed, template: Prompt
         registry.enabled = True
         registry.required_permissions = feature.required_permissions
 
-    db.flush()
+    await db.flush()
     return registry
 
 
-def _upsert_prompt_version(db: Session, feature: FeatureSeed, prompt_base: PromptBase, template: PromptTemplate) -> PromptVersion:
-    prompt_version = (
-        db.query(PromptVersion)
-        .filter(
+async def _upsert_prompt_version(db: AsyncSession, feature: FeatureSeed, prompt_base: PromptBase, template: PromptTemplate) -> PromptVersion:
+    prompt_version = await db.scalar(
+        select(PromptVersion).where(
             PromptVersion.feature_id == feature.feature_id,
             PromptVersion.version == feature.prompt_version,
         )
-        .first()
     )
 
     if not prompt_version:
@@ -264,29 +263,27 @@ def _upsert_prompt_version(db: Session, feature: FeatureSeed, prompt_base: Promp
         prompt_version.user_prompt_template = feature.user_prompt_template
         prompt_version.status = "active"
 
-    db.flush()
+    await db.flush()
     return prompt_version
 
 
-def seed_prompt_data() -> None:
-    init_db()
-    db = SessionLocal()
-    try:
-        prompt_base = _upsert_prompt_base(db)
+async def seed_prompt_data() -> None:
+    await init_db()
+    async with AsyncSessionLocal() as db:
+        try:
+            prompt_base = await _upsert_prompt_base(db)
 
-        for feature in FEATURES:
-            template = _upsert_prompt_template(db, feature)
-            _upsert_feature_registry(db, feature, template)
-            _upsert_prompt_version(db, feature, prompt_base, template)
+            for feature in FEATURES:
+                template = await _upsert_prompt_template(db, feature)
+                await _upsert_feature_registry(db, feature, template)
+                await _upsert_prompt_version(db, feature, prompt_base, template)
 
-        db.commit()
-        print("Seed completed: prompt_base, prompt_templates, ai_feature_registry, prompt_versions")
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
+            await db.commit()
+            print("Seed completed: prompt_base, prompt_templates, ai_feature_registry, prompt_versions")
+        except Exception:
+            await db.rollback()
+            raise
 
 
 if __name__ == "__main__":
-    seed_prompt_data()
+    asyncio.run(seed_prompt_data())

@@ -5,7 +5,7 @@ from io import BytesIO
 from typing import Optional
 
 from pypdf import PdfReader
-from sqlalchemy.orm import Session as DBSession
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import logger
 from app.schemas.schemas import DocumentInputSchema
@@ -33,7 +33,7 @@ class PDFIngestService:
 
     async def ingest_pdf_bytes(
         self,
-        db: DBSession,
+        db: AsyncSession,
         file_bytes: bytes,
         title: str,
         source: str,
@@ -41,7 +41,7 @@ class PDFIngestService:
         source_id: Optional[str] = None,
         document_type: str = "texte",
         metadata: Optional[dict] = None,
-    ) -> dict:
+    ):
         text = await self.extract_text_from_pdf_bytes(file_bytes)
         if not text:
             raise ValueError("No text extracted from PDF")

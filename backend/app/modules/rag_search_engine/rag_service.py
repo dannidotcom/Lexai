@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Optional
 
 from rank_bm25 import BM25Okapi
-from sqlalchemy.orm import Session as DBSession
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import logger
 from app.models.db_models import Chunk, Document
-from app.schemas.schemas import ContextResultSchema, SearchResultItemSchema, SearchResultSchema
 from app.modules.rag_vecor_engine.infrastructure import vector_store
+from app.schemas.schemas import ContextResultSchema, SearchResultItemSchema, SearchResultSchema
 from app.shared.ollama_service import ollama_service
 
 
@@ -16,13 +17,13 @@ class RAGService:
     async def search(
         self,
         query: str,
-        db: DBSession,
+        db: AsyncSession,
         domain: Optional[str] = None,
         sub_domain: Optional[str] = None,
         limit: int = 5,
         search_type: str = "hybrid",
     ) -> SearchResultSchema:
-        items: List[SearchResultItemSchema] = []
+        items: list[SearchResultItemSchema] = []
 
         if search_type in ("vector", "hybrid"):
             vector_items = await self._vector_search(query, db, domain, limit)
@@ -52,7 +53,7 @@ class RAGService:
     async def get_context(
         self,
         query: str,
-        db: DBSession,
+        db: AsyncSession,
         domain: Optional[str] = None,
         limit: int = 5,
     ) -> ContextResultSchema:
@@ -74,10 +75,10 @@ class RAGService:
     async def _vector_search(
         self,
         query: str,
-        db: DBSession,
+        db: AsyncSession,
         domain: Optional[str] = None,
         limit: int = 5,
-    ) -> List[SearchResultItemSchema]:
+    ) -> list[SearchResultItemSchema]:
         embedding = await ollama_service.generate_embedding(query)
         if not embedding:
             logger.warning("No embedding generated, skipping vector search")
@@ -91,21 +92,28 @@ class RAGService:
             if not chunk_id:
                 continue
 
-            chunk = db.query(Chunk).filter(Chunk.id == chunk_id).first()
-            if not chunk or not chunk.document:
+            row = (
+                await db.execute(
+                    select(Chunk, Document)
+                    .join(Document, Document.id == Chunk.document_id)
+                    .where(Chunk.id == chunk_id)
+                )
+            ).first()
+            if not row:
                 continue
 
+            chunk, document = row
             items.append(
                 SearchResultItemSchema(
                     chunkId=chunk.id,
                     documentId=chunk.document_id,
-                    documentTitle=chunk.document.title,
-                    source=chunk.document.source,
+                    documentTitle=document.title,
+                    source=document.source,
                     content=chunk.content,
                     sectionPath=chunk.section_path,
                     articleId=chunk.article_id,
                     score=float(point.score),
-                    domain=chunk.document.domain,
+                    domain=document.domain,
                 )
             )
         return items
@@ -113,43 +121,43 @@ class RAGService:
     async def _bm25_search(
         self,
         query: str,
-        db: DBSession,
+        db: AsyncSession,
         domain: Optional[str] = None,
         limit: int = 5,
-    ) -> List[SearchResultItemSchema]:
-        query_db = db.query(Chunk).join(Document)
+    ) -> list[SearchResultItemSchema]:
+        stmt = select(Chunk, Document).join(Document, Document.id == Chunk.document_id)
         if domain:
-            query_db = query_db.filter(Document.domain == domain)
-        query_db = query_db.filter(Chunk.statut_juridique.in_(["VIGUEUR", "VIGUEUR_ETEN"]))
-        chunks = query_db.limit(500).all()
+            stmt = stmt.where(Document.domain == domain)
+        stmt = stmt.where(Chunk.statut_juridique.in_(["VIGUEUR", "VIGUEUR_ETEN"]))
+        stmt = stmt.limit(500)
 
-        if not chunks:
+        rows = (await db.execute(stmt)).all()
+        if not rows:
             return []
 
-        tokenized = [c.content.lower().split() for c in chunks]
+        pairs = [(row[0], row[1]) for row in rows]
+        tokenized = [chunk.content.lower().split() for chunk, _ in pairs]
         bm25 = BM25Okapi(tokenized)
         query_tokens = query.lower().split()
         scores = bm25.get_scores(query_tokens)
 
-        ranked = sorted(zip(chunks, scores), key=lambda x: x[1], reverse=True)[:limit]
+        ranked = sorted(zip(pairs, scores), key=lambda x: x[1], reverse=True)[:limit]
 
         items = []
-        for chunk, score in ranked:
+        for (chunk, document), score in ranked:
             if score < 0.01:
-                continue
-            if not chunk.document:
                 continue
             items.append(
                 SearchResultItemSchema(
                     chunkId=chunk.id,
                     documentId=chunk.document_id,
-                    documentTitle=chunk.document.title,
-                    source=chunk.document.source,
+                    documentTitle=document.title,
+                    source=document.source,
                     content=chunk.content,
                     sectionPath=chunk.section_path,
                     articleId=chunk.article_id,
                     score=float(score),
-                    domain=chunk.document.domain,
+                    domain=document.domain,
                 )
             )
         return items

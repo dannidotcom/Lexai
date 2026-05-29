@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.schemas.schemas import DocumentSchema
@@ -16,7 +16,7 @@ async def upload_pdf(
     domain: str = Form(...),
     sourceId: str | None = Form(default=None),
     documentType: str = Form("texte"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")

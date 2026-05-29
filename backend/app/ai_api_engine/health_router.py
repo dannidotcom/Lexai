@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import check_db, get_db
@@ -11,8 +11,8 @@ router = APIRouter(tags=["Health and Status"])
 
 
 @router.get("/healthz", response_model=HealthStatusSchema)
-def health_check(db: Session = Depends(get_db)):
-    db_status = "ok" if check_db() else "error"
+async def health_check(_: AsyncSession = Depends(get_db)):
+    db_status = "ok" if await check_db() else "error"
     try:
         vec_count = vector_store.count()
         vec_status = f"ok ({vec_count} vectors)"

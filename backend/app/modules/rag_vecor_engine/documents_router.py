@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.logging import logger
@@ -18,23 +18,23 @@ router = APIRouter(prefix="/documents", tags=["Documents and Ingestion"])
 
 
 @router.get("", response_model=List[DocumentSchema])
-def list_documents(
+async def list_documents(
     domain: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
-    return document_service.list_documents(db, domain=domain, status=status, limit=limit, offset=offset)
+    return await document_service.list_documents(db, domain=domain, status=status, limit=limit, offset=offset)
 
 
 @router.post("", response_model=DocumentSchema, status_code=201)
-async def ingest_document(data: DocumentInputSchema, db: Session = Depends(get_db)):
+async def ingest_document(data: DocumentInputSchema, db: AsyncSession = Depends(get_db)):
     return await document_service.ingest_document(db, data)
 
 
 @router.post("/ingest/legifrance", response_model=LegifranceIngestResultSchema, status_code=201)
-async def ingest_legifrance_json(data: LegifranceIngestInputSchema, db: Session = Depends(get_db)):
+async def ingest_legifrance_json(data: LegifranceIngestInputSchema, db: AsyncSession = Depends(get_db)):
     try:
         kali_doc = parse_kali_json(data.kaliJson)
     except Exception as exc:
@@ -78,23 +78,23 @@ async def ingest_legifrance_json(data: LegifranceIngestInputSchema, db: Session 
 
 
 @router.get("/{id}", response_model=DocumentSchema)
-def get_document(id: str, db: Session = Depends(get_db)):
-    doc = document_service.get_document(db, id)
+async def get_document(id: str, db: AsyncSession = Depends(get_db)):
+    doc = await document_service.get_document(db, id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
 
 
 @router.delete("/{id}", status_code=204)
-def delete_document(id: str, db: Session = Depends(get_db)):
-    ok = document_service.delete_document(db, id)
+async def delete_document(id: str, db: AsyncSession = Depends(get_db)):
+    ok = await document_service.delete_document(db, id)
     if not ok:
         raise HTTPException(status_code=404, detail="Document not found")
 
 
 @router.get("/{id}/chunks", response_model=List[ChunkSchema])
-def get_document_chunks(id: str, db: Session = Depends(get_db)):
-    return document_service.get_chunks(db, id)
+async def get_document_chunks(id: str, db: AsyncSession = Depends(get_db)):
+    return await document_service.get_chunks(db, id)
 
 
 __all__ = ["router"]

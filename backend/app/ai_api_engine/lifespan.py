@@ -15,7 +15,7 @@ async def app_lifespan(_: FastAPI):
     logger.info("Starting LexIA API", version=settings.version)
 
     try:
-        init_db()
+        await init_db()
         logger.info("Database initialized")
     except Exception as exc:
         logger.error("Database init failed", error=str(exc))

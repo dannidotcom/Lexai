@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.schemas.schemas import ContextResultSchema, SearchInputSchema, SearchResultSchema
@@ -9,7 +9,7 @@ router = APIRouter(prefix="/rag", tags=["RAG Search and Context"])
 
 
 @router.post("/search", response_model=SearchResultSchema)
-async def search(data: SearchInputSchema, db: Session = Depends(get_db)):
+async def search(data: SearchInputSchema, db: AsyncSession = Depends(get_db)):
     return await rag_service.search(
         query=data.query,
         db=db,
@@ -21,7 +21,7 @@ async def search(data: SearchInputSchema, db: Session = Depends(get_db)):
 
 
 @router.post("/context", response_model=ContextResultSchema)
-async def get_context(data: SearchInputSchema, db: Session = Depends(get_db)):
+async def get_context(data: SearchInputSchema, db: AsyncSession = Depends(get_db)):
     return await rag_service.get_context(
         query=data.query,
         db=db,

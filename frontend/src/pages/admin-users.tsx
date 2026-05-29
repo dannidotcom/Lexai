@@ -431,8 +431,8 @@ export default function AdminUsersPage() {
                                     {(member.full_name ?? member.email).trim().charAt(0).toUpperCase()}
                                   </div>
                                   <div className="min-w-0">
-                                    <p className="truncate text-[13px] font-semibold text-gray-900">{member.email}</p>
-                                    <p className="truncate text-[12px] text-gray-500">{member.full_name ?? "Nom non renseigne"}</p>
+                                    <p className="truncate text-[13px] font-semibold text-gray-900">{member.full_name ?? "Nom non renseigne"}</p>
+                                    <p className="truncate text-[12px] text-gray-500">{member.email}</p>
                                   </div>
                                 </div>
                               </TableCell>

@@ -4,7 +4,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy.orm import Session as DBSession
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.db_models import AiFeatureRegistry, PromptBase, PromptTemplate, PromptVersion
 
@@ -27,49 +28,45 @@ class ResolvedPromptConfiguration:
 class PromptService:
     _placeholder_pattern = re.compile(r"{{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*}}")
 
-    def resolve_active_prompt(self, db: DBSession, feature_id: str) -> ResolvedPromptConfiguration:
-        feature = (
-            db.query(AiFeatureRegistry)
-            .filter(
+    async def resolve_active_prompt(self, db: AsyncSession, feature_id: str) -> ResolvedPromptConfiguration:
+        feature = await db.scalar(
+            select(AiFeatureRegistry)
+            .where(
                 AiFeatureRegistry.feature_id == feature_id,
                 AiFeatureRegistry.enabled.is_(True),
             )
-            .first()
         )
         if not feature:
             raise PromptConfigurationError(f"No enabled feature registry found for feature_id '{feature_id}'")
 
-        template = (
-            db.query(PromptTemplate)
-            .filter(
+        template = await db.scalar(
+            select(PromptTemplate)
+            .where(
                 PromptTemplate.id == feature.template_id,
                 PromptTemplate.status == "active",
             )
             .order_by(PromptTemplate.version.desc())
-            .first()
         )
         if not template:
             raise PromptConfigurationError(f"No active prompt_template found for feature_id '{feature_id}'")
 
-        prompt_base = (
-            db.query(PromptBase)
-            .filter(PromptBase.status == "active")
+        prompt_base = await db.scalar(
+            select(PromptBase)
+            .where(PromptBase.status == "active")
             .order_by(PromptBase.version.desc(), PromptBase.created_at.desc())
-            .first()
         )
         if not prompt_base:
             raise PromptConfigurationError(f"No active prompt_base found for feature_id '{feature_id}'")
 
-        prompt_version = (
-            db.query(PromptVersion)
-            .filter(
+        prompt_version = await db.scalar(
+            select(PromptVersion)
+            .where(
                 PromptVersion.feature_id == feature_id,
                 PromptVersion.prompt_base_id == prompt_base.id,
                 PromptVersion.template_id == template.id,
                 PromptVersion.status == "active",
             )
             .order_by(PromptVersion.version.desc(), PromptVersion.created_at.desc())
-            .first()
         )
         if not prompt_version:
             raise PromptConfigurationError(f"No active prompt_version found for feature_id '{feature_id}'")

@@ -1,30 +1,29 @@
 from typing import List
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.db_models import Chunk, Document, Message, Session as SessionModel
 from app.schemas.schemas import DashboardStatsSchema, DomainStatSchema
-from app.modules.rag_vecor_engine.infrastructure import vector_store
 from app.shared.ollama_service import ollama_service
 
 router = APIRouter(prefix="/stats", tags=["Statistics and Dashboard"])
 
 
 @router.get("/dashboard", response_model=DashboardStatsSchema)
-async def dashboard_stats(db: Session = Depends(get_db)):
-    total_docs = db.query(func.count(Document.id)).scalar() or 0
-    total_chunks = db.query(func.count(Chunk.id)).scalar() or 0
-    total_embeddings = db.query(func.count(Chunk.id)).filter(Chunk.embedding_generated == True).scalar() or 0
-    total_sessions = db.query(func.count(SessionModel.id)).scalar() or 0
-    total_queries = db.query(func.count(Message.id)).filter(Message.role == "user").scalar() or 0
+async def dashboard_stats(db: AsyncSession = Depends(get_db)):
+    total_docs = (await db.scalar(select(func.count(Document.id)))) or 0
+    total_chunks = (await db.scalar(select(func.count(Chunk.id)))) or 0
+    total_embeddings = (await db.scalar(select(func.count(Chunk.id)).where(Chunk.embedding_generated.is_(True)))) or 0
+    total_sessions = (await db.scalar(select(func.count(SessionModel.id)))) or 0
+    total_queries = (await db.scalar(select(func.count(Message.id)).where(Message.role == "user"))) or 0
 
-    domain_rows = db.query(Document.domain, func.count(Document.id)).group_by(Document.domain).all()
+    domain_rows = (await db.execute(select(Document.domain, func.count(Document.id)).group_by(Document.domain))).all()
     docs_per_domain = {row[0]: row[1] for row in domain_rows}
 
-    recent_docs = db.query(Document).order_by(Document.created_at.desc()).limit(5).all()
+    recent_docs = (await db.execute(select(Document).order_by(Document.created_at.desc()).limit(5))).scalars().all()
     recent_activity = [
         {
             "type": "document",
@@ -41,8 +40,8 @@ async def dashboard_stats(db: Session = Depends(get_db)):
     ollama_info = await ollama_service.check_availability()
     ollama_available = ollama_info["available"]
 
-    indexed_count = db.query(func.count(Document.id)).filter(Document.status == "indexed").scalar() or 0
-    pending_count = db.query(func.count(Document.id)).filter(Document.status == "pending").scalar() or 0
+    indexed_count = (await db.scalar(select(func.count(Document.id)).where(Document.status == "indexed"))) or 0
+    pending_count = (await db.scalar(select(func.count(Document.id)).where(Document.status == "pending"))) or 0
     if pending_count > 0:
         indexing_status = f"{pending_count} en attente"
     elif indexed_count > 0:
@@ -64,18 +63,19 @@ async def dashboard_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/domains", response_model=List[DomainStatSchema])
-def domain_stats(db: Session = Depends(get_db)):
-    domain_docs = db.query(Document.domain, func.count(Document.id)).group_by(Document.domain).all()
+async def domain_stats(db: AsyncSession = Depends(get_db)):
+    domain_docs = (await db.execute(select(Document.domain, func.count(Document.id)).group_by(Document.domain))).all()
+
     result = []
     for domain, doc_count in domain_docs:
-        chunk_count = db.query(func.count(Chunk.id)).join(Document).filter(Document.domain == domain).scalar() or 0
-        sources = [
-            row[0]
-            for row in db.query(Document.source)
-            .filter(Document.domain == domain)
-            .distinct()
-            .all()
-        ]
+        chunk_count = (await db.scalar(select(func.count(Chunk.id)).join(Document).where(Document.domain == domain))) or 0
+        sources = (
+            await db.execute(
+                select(Document.source)
+                .where(Document.domain == domain)
+                .distinct()
+            )
+        ).scalars().all()
         result.append(
             DomainStatSchema(
                 domain=domain,

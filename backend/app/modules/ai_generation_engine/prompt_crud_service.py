@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import func
-from sqlalchemy.orm import Session as DBSession
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.db_models import AiFeatureRegistry, PromptBase, PromptTemplate, PromptVersion
 from app.schemas.schemas import (
@@ -17,18 +17,19 @@ from app.schemas.schemas import (
 
 
 class PromptCrudService:
-    def list_prompt_bases(self, db: DBSession, status: str | None, limit: int, offset: int) -> list[PromptBase]:
-        query = db.query(PromptBase)
+    async def list_prompt_bases(self, db: AsyncSession, status: str | None, limit: int, offset: int) -> list[PromptBase]:
+        stmt = select(PromptBase)
         if status:
-            query = query.filter(PromptBase.status == status)
-        return query.order_by(PromptBase.created_at.desc()).offset(offset).limit(limit).all()
+            stmt = stmt.where(PromptBase.status == status)
+        stmt = stmt.order_by(PromptBase.created_at.desc()).offset(offset).limit(limit)
+        return list((await db.execute(stmt)).scalars().all())
 
-    def get_prompt_base(self, db: DBSession, prompt_base_id: uuid.UUID) -> PromptBase | None:
-        return db.query(PromptBase).filter(PromptBase.id == prompt_base_id).first()
+    async def get_prompt_base(self, db: AsyncSession, prompt_base_id: uuid.UUID) -> PromptBase | None:
+        return await db.scalar(select(PromptBase).where(PromptBase.id == prompt_base_id))
 
-    def create_prompt_base(self, db: DBSession, payload: PromptBaseCreateSchema) -> PromptBase:
-        version = payload.version or self._next_prompt_base_version(db)
-        exists = db.query(PromptBase).filter(PromptBase.version == version).first()
+    async def create_prompt_base(self, db: AsyncSession, payload: PromptBaseCreateSchema) -> PromptBase:
+        version = payload.version or await self._next_prompt_base_version(db)
+        exists = await db.scalar(select(PromptBase).where(PromptBase.version == version))
         if exists:
             raise ValueError(f"PromptBase version {version} already exists")
 
@@ -38,11 +39,11 @@ class PromptCrudService:
             status=payload.status,
         )
         db.add(prompt_base)
-        db.commit()
-        db.refresh(prompt_base)
+        await db.commit()
+        await db.refresh(prompt_base)
         return prompt_base
 
-    def update_prompt_base(self, db: DBSession, prompt_base: PromptBase, payload: PromptBaseUpdateSchema) -> PromptBase:
+    async def update_prompt_base(self, db: AsyncSession, prompt_base: PromptBase, payload: PromptBaseUpdateSchema) -> PromptBase:
         changed = False
 
         if "content" in payload.model_fields_set and payload.content is not None and prompt_base.content != payload.content:
@@ -56,41 +57,40 @@ class PromptCrudService:
         if not changed:
             raise ValueError("No fields to update")
 
-        db.commit()
-        db.refresh(prompt_base)
+        await db.commit()
+        await db.refresh(prompt_base)
         return prompt_base
 
-    def delete_prompt_base(self, db: DBSession, prompt_base: PromptBase) -> None:
-        db.delete(prompt_base)
-        db.commit()
+    async def delete_prompt_base(self, db: AsyncSession, prompt_base: PromptBase) -> None:
+        await db.delete(prompt_base)
+        await db.commit()
 
-    def list_prompt_templates(
+    async def list_prompt_templates(
         self,
-        db: DBSession,
+        db: AsyncSession,
         feature_id: str | None,
         status: str | None,
         limit: int,
         offset: int,
     ) -> list[PromptTemplate]:
-        query = db.query(PromptTemplate)
+        stmt = select(PromptTemplate)
         if feature_id:
-            query = query.filter(PromptTemplate.feature_id == feature_id)
+            stmt = stmt.where(PromptTemplate.feature_id == feature_id)
         if status:
-            query = query.filter(PromptTemplate.status == status)
-        return query.order_by(PromptTemplate.created_at.desc()).offset(offset).limit(limit).all()
+            stmt = stmt.where(PromptTemplate.status == status)
+        stmt = stmt.order_by(PromptTemplate.created_at.desc()).offset(offset).limit(limit)
+        return list((await db.execute(stmt)).scalars().all())
 
-    def get_prompt_template(self, db: DBSession, template_id: uuid.UUID) -> PromptTemplate | None:
-        return db.query(PromptTemplate).filter(PromptTemplate.id == template_id).first()
+    async def get_prompt_template(self, db: AsyncSession, template_id: uuid.UUID) -> PromptTemplate | None:
+        return await db.scalar(select(PromptTemplate).where(PromptTemplate.id == template_id))
 
-    def create_prompt_template(self, db: DBSession, payload: PromptTemplateCreateSchema) -> PromptTemplate:
-        version = payload.version or self._next_template_version(db, payload.feature_id)
-        exists = (
-            db.query(PromptTemplate)
-            .filter(
+    async def create_prompt_template(self, db: AsyncSession, payload: PromptTemplateCreateSchema) -> PromptTemplate:
+        version = payload.version or await self._next_template_version(db, payload.feature_id)
+        exists = await db.scalar(
+            select(PromptTemplate).where(
                 PromptTemplate.feature_id == payload.feature_id,
                 PromptTemplate.version == version,
             )
-            .first()
         )
         if exists:
             raise ValueError(f"PromptTemplate version {version} already exists for feature_id '{payload.feature_id}'")
@@ -108,17 +108,17 @@ class PromptCrudService:
             status=payload.status,
         )
         db.add(template)
-        db.flush()
+        await db.flush()
 
-        feature = db.query(AiFeatureRegistry).filter(AiFeatureRegistry.feature_id == payload.feature_id).first()
+        feature = await db.scalar(select(AiFeatureRegistry).where(AiFeatureRegistry.feature_id == payload.feature_id))
         if feature:
             feature.template_id = template.id
 
-        db.commit()
-        db.refresh(template)
+        await db.commit()
+        await db.refresh(template)
         return template
 
-    def update_prompt_template(self, db: DBSession, template: PromptTemplate, payload: PromptTemplateUpdateSchema) -> PromptTemplate:
+    async def update_prompt_template(self, db: AsyncSession, template: PromptTemplate, payload: PromptTemplateUpdateSchema) -> PromptTemplate:
         changed = False
 
         if "name" in payload.model_fields_set and payload.name is not None and template.name != payload.name:
@@ -164,48 +164,47 @@ class PromptCrudService:
         if not changed:
             raise ValueError("No fields to update")
 
-        db.commit()
-        db.refresh(template)
+        await db.commit()
+        await db.refresh(template)
         return template
 
-    def delete_prompt_template(self, db: DBSession, template: PromptTemplate) -> None:
-        db.delete(template)
-        db.commit()
+    async def delete_prompt_template(self, db: AsyncSession, template: PromptTemplate) -> None:
+        await db.delete(template)
+        await db.commit()
 
-    def list_prompt_versions(
+    async def list_prompt_versions(
         self,
-        db: DBSession,
+        db: AsyncSession,
         feature_id: str | None,
         status: str | None,
         limit: int,
         offset: int,
     ) -> list[PromptVersion]:
-        query = db.query(PromptVersion)
+        stmt = select(PromptVersion)
         if feature_id:
-            query = query.filter(PromptVersion.feature_id == feature_id)
+            stmt = stmt.where(PromptVersion.feature_id == feature_id)
         if status:
-            query = query.filter(PromptVersion.status == status)
-        return query.order_by(PromptVersion.created_at.desc()).offset(offset).limit(limit).all()
+            stmt = stmt.where(PromptVersion.status == status)
+        stmt = stmt.order_by(PromptVersion.created_at.desc()).offset(offset).limit(limit)
+        return list((await db.execute(stmt)).scalars().all())
 
-    def get_prompt_version(self, db: DBSession, prompt_version_id: uuid.UUID) -> PromptVersion | None:
-        return db.query(PromptVersion).filter(PromptVersion.id == prompt_version_id).first()
+    async def get_prompt_version(self, db: AsyncSession, prompt_version_id: uuid.UUID) -> PromptVersion | None:
+        return await db.scalar(select(PromptVersion).where(PromptVersion.id == prompt_version_id))
 
-    def create_prompt_version(self, db: DBSession, payload: PromptVersionCreateSchema) -> PromptVersion:
-        self._validate_prompt_version_links(
+    async def create_prompt_version(self, db: AsyncSession, payload: PromptVersionCreateSchema) -> PromptVersion:
+        await self._validate_prompt_version_links(
             db,
             feature_id=payload.feature_id,
             prompt_base_id=payload.prompt_base_id,
             template_id=payload.template_id,
         )
 
-        version = payload.version or self._next_prompt_version(db, payload.feature_id)
-        exists = (
-            db.query(PromptVersion)
-            .filter(
+        version = payload.version or await self._next_prompt_version(db, payload.feature_id)
+        exists = await db.scalar(
+            select(PromptVersion).where(
                 PromptVersion.feature_id == payload.feature_id,
                 PromptVersion.version == version,
             )
-            .first()
         )
         if exists:
             raise ValueError(f"PromptVersion version {version} already exists for feature_id '{payload.feature_id}'")
@@ -220,20 +219,20 @@ class PromptCrudService:
             status=payload.status,
         )
         db.add(prompt_version)
-        db.commit()
-        db.refresh(prompt_version)
+        await db.commit()
+        await db.refresh(prompt_version)
         return prompt_version
 
-    def update_prompt_version(
+    async def update_prompt_version(
         self,
-        db: DBSession,
+        db: AsyncSession,
         prompt_version: PromptVersion,
         payload: PromptVersionUpdateSchema,
     ) -> PromptVersion:
         next_prompt_base_id = payload.prompt_base_id or prompt_version.prompt_base_id
         next_template_id = payload.template_id or prompt_version.template_id
 
-        self._validate_prompt_version_links(
+        await self._validate_prompt_version_links(
             db,
             feature_id=prompt_version.feature_id,
             prompt_base_id=next_prompt_base_id,
@@ -273,31 +272,31 @@ class PromptCrudService:
         if not changed:
             raise ValueError("No fields to update")
 
-        db.commit()
-        db.refresh(prompt_version)
+        await db.commit()
+        await db.refresh(prompt_version)
         return prompt_version
 
-    def delete_prompt_version(self, db: DBSession, prompt_version: PromptVersion) -> None:
-        db.delete(prompt_version)
-        db.commit()
+    async def delete_prompt_version(self, db: AsyncSession, prompt_version: PromptVersion) -> None:
+        await db.delete(prompt_version)
+        await db.commit()
 
-    def _validate_prompt_version_links(
+    async def _validate_prompt_version_links(
         self,
-        db: DBSession,
+        db: AsyncSession,
         *,
         feature_id: str,
         prompt_base_id: uuid.UUID,
         template_id: uuid.UUID,
     ) -> None:
-        feature = db.query(AiFeatureRegistry).filter(AiFeatureRegistry.feature_id == feature_id).first()
+        feature = await db.scalar(select(AiFeatureRegistry).where(AiFeatureRegistry.feature_id == feature_id))
         if not feature:
             raise ValueError(f"Feature '{feature_id}' does not exist in ai_feature_registry")
 
-        prompt_base = db.query(PromptBase).filter(PromptBase.id == prompt_base_id).first()
+        prompt_base = await db.scalar(select(PromptBase).where(PromptBase.id == prompt_base_id))
         if not prompt_base:
             raise ValueError("prompt_base_id does not exist")
 
-        template = db.query(PromptTemplate).filter(PromptTemplate.id == template_id).first()
+        template = await db.scalar(select(PromptTemplate).where(PromptTemplate.id == template_id))
         if not template:
             raise ValueError("template_id does not exist")
 
@@ -309,16 +308,16 @@ class PromptCrudService:
                 "template_id does not match ai_feature_registry.template_id for this feature_id"
             )
 
-    def _next_prompt_base_version(self, db: DBSession) -> int:
-        current = db.query(func.max(PromptBase.version)).scalar()
+    async def _next_prompt_base_version(self, db: AsyncSession) -> int:
+        current = await db.scalar(select(func.max(PromptBase.version)))
         return int((current or 0) + 1)
 
-    def _next_template_version(self, db: DBSession, feature_id: str) -> int:
-        current = db.query(func.max(PromptTemplate.version)).filter(PromptTemplate.feature_id == feature_id).scalar()
+    async def _next_template_version(self, db: AsyncSession, feature_id: str) -> int:
+        current = await db.scalar(select(func.max(PromptTemplate.version)).where(PromptTemplate.feature_id == feature_id))
         return int((current or 0) + 1)
 
-    def _next_prompt_version(self, db: DBSession, feature_id: str) -> int:
-        current = db.query(func.max(PromptVersion.version)).filter(PromptVersion.feature_id == feature_id).scalar()
+    async def _next_prompt_version(self, db: AsyncSession, feature_id: str) -> int:
+        current = await db.scalar(select(func.max(PromptVersion.version)).where(PromptVersion.feature_id == feature_id))
         return int((current or 0) + 1)
 
 
